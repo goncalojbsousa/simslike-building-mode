@@ -1,0 +1,30 @@
+[gd_scene format=3 uid="uid://cp42lw46d2fbu"]
+
+[ext_resource type="Shader" uid="uid://m8fivrx7djhv" path="res://materials/GridMaterial.gdshader" id="1_u1xfj"]
+[ext_resource type="PackedScene" uid="uid://dgep2mlm12hr0" path="res://scenes/camera/CameraRig.tscn" id="2_nha0i"]
+[ext_resource type="Script" uid="uid://c777cdmfeloxm" path="res://scripts/MouseRaycast.gd" id="3_q24mn"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_vyk5b"]
+size = Vector2(100, 100)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_nha0i"]
+render_priority = 0
+shader = ExtResource("1_u1xfj")
+shader_parameter/tile_size = 2.0
+shader_parameter/line_thickness = 0.02
+shader_parameter/line_color = Color(1, 1, 1, 0.25)
+shader_parameter/fill_color = Color(0, 0, 0, 0)
+
+[node name="Main" type="Node3D" unique_id=534080925]
+
+[node name="Ground" type="MeshInstance3D" parent="." unique_id=538603552]
+mesh = SubResource("PlaneMesh_vyk5b")
+surface_material_override/0 = SubResource("ShaderMaterial_nha0i")
+
+[node name="CameraRig" parent="." unique_id=840342181 instance=ExtResource("2_nha0i")]
+
+[node name="MouseRaycast" type="Node" parent="." unique_id=252530184 node_paths=PackedStringArray("camera")]
+script = ExtResource("3_q24mn")
+camera = NodePath("../CameraRig/PitchArm/Camera3D")
+
+[editable path="CameraRig"]
