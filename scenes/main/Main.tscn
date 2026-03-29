@@ -1,8 +1,11 @@
 [gd_scene format=3 uid="uid://cp42lw46d2fbu"]
 
+[ext_resource type="Script" uid="uid://cyviil6knkcat" path="res://scenes/main/main.gd" id="1_1rhdn"]
 [ext_resource type="Shader" uid="uid://m8fivrx7djhv" path="res://materials/GridMaterial.gdshader" id="1_u1xfj"]
 [ext_resource type="PackedScene" uid="uid://dgep2mlm12hr0" path="res://scenes/camera/CameraRig.tscn" id="2_nha0i"]
 [ext_resource type="Script" uid="uid://c777cdmfeloxm" path="res://scripts/MouseRaycast.gd" id="3_q24mn"]
+[ext_resource type="Script" uid="uid://bs7ypee2pc7p7" path="res://scripts/WallPlacer.gd" id="4_dc040"]
+[ext_resource type="Script" uid="uid://c18i4b2cagrop" path="res://scenes/walls/WallVisuals.gd" id="4_gyg6b"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_vyk5b"]
 size = Vector2(100, 100)
@@ -16,6 +19,7 @@ shader_parameter/line_color = Color(1, 1, 1, 0.25)
 shader_parameter/fill_color = Color(0, 0, 0, 0)
 
 [node name="Main" type="Node3D" unique_id=534080925]
+script = ExtResource("1_1rhdn")
 
 [node name="Ground" type="MeshInstance3D" parent="." unique_id=538603552]
 mesh = SubResource("PlaneMesh_vyk5b")
@@ -26,5 +30,12 @@ surface_material_override/0 = SubResource("ShaderMaterial_nha0i")
 [node name="MouseRaycast" type="Node" parent="." unique_id=252530184 node_paths=PackedStringArray("camera")]
 script = ExtResource("3_q24mn")
 camera = NodePath("../CameraRig/PitchArm/Camera3D")
+
+[node name="WallPlacer" type="Node" parent="." unique_id=1919074811 node_paths=PackedStringArray("mouse_raycast")]
+script = ExtResource("4_dc040")
+mouse_raycast = NodePath("../MouseRaycast")
+
+[node name="WallContainer" type="Node3D" parent="." unique_id=982250955]
+script = ExtResource("4_gyg6b")
 
 [editable path="CameraRig"]

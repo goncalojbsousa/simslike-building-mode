@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 FurnitureSystem="*uid://b6t864yapyqq4"
 GridManager="*uid://o6i5sik6l3sd"
 WallSystem="*uid://dludbmcdoedw1"
+UndoHistory="*uid://4bni5qs06fm4"
 
 [display]
 
