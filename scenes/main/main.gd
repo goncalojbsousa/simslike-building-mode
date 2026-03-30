@@ -1,39 +1,88 @@
+# Main.gd — full replacement
 extends Node3D
 
+@onready var wall_placer: Node = get_node_or_null("WallPlacer")
+@onready var furniture_placer: Node = get_node_or_null("FurniturePlacer")
+@onready var opening_placer: Node = get_node_or_null("OpeningPlacer")
+@onready var floor_painter: Node = get_node_or_null("FloorPainter")
+@onready var ground_grid: Node3D = get_node_or_null("Ground") as Node3D
 
-# Called when the node enters the scene tree for the first time.
+const FURNITURE_CATALOG := {
+	"desk": { "scene": "res://scenes/furniture/Desk.tscn", "size": Vector2i(1, 2) },
+}
+
 func _ready() -> void:
-	pass # Replace with function body.
+	FloorManager.floor_changed.connect(_on_floor_changed)
+	_update_grid_floor_height()
+	_activate_wall_mode()
 
-
-# Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta: float) -> void:
-	pass
-	
-	
 func _unhandled_input(event: InputEvent) -> void:
-	if _is_history_shortcut_pressed(event, "undo", "ui_undo"):
-		UndoHistory.undo()
-	elif _is_history_shortcut_pressed(event, "redo", "ui_redo"):
-		UndoHistory.redo()
+	if not event is InputEventKey:
+		return
+	var ke := event as InputEventKey
+	if not ke.pressed:
+		return
 
-func _is_history_shortcut_pressed(event: InputEvent, primary: StringName, fallback: StringName) -> bool:
-	if InputMap.has_action(primary) and event.is_action_pressed(primary):
-		return true
+	match ke.keycode:
+		KEY_1: _activate_wall_mode()
+		KEY_2: _activate_furniture_mode("desk")
+		KEY_3: _activate_opening_mode("door")
+		KEY_4: _activate_opening_mode("window")
+		KEY_5: _activate_floor_paint_mode()
+		KEY_Q: FloorManager.go_down()
+		KEY_E: FloorManager.go_up()
+		KEY_Z:
+			if ke.ctrl_pressed or ke.meta_pressed:
+				UndoHistory.undo()
+		KEY_Y:
+			if ke.ctrl_pressed or ke.meta_pressed:
+				UndoHistory.redo()
 
-	if InputMap.has_action(fallback) and event.is_action_pressed(fallback):
-		return true
+func _activate_wall_mode() -> void:
+	_deactivate_all()
+	if wall_placer != null and wall_placer.has_method("activate"):
+		wall_placer.activate()
 
-	if event is InputEventKey:
-		var key_event := event as InputEventKey
-		if key_event.pressed and not key_event.echo:
-			var ctrl_or_cmd := key_event.ctrl_pressed or key_event.meta_pressed
-			if ctrl_or_cmd and primary == "undo" and key_event.keycode == KEY_Z:
-				return true
-			if ctrl_or_cmd and primary == "redo":
-				if key_event.keycode == KEY_Y:
-					return true
-				if key_event.shift_pressed and key_event.keycode == KEY_Z:
-					return true
+func _activate_furniture_mode(key: String) -> void:
+	_deactivate_all()
+	var item: Dictionary = FURNITURE_CATALOG.get(key, {})
+	if item.is_empty() or furniture_placer == null:
+		return
+	if furniture_placer.has_method("activate"):
+		furniture_placer.activate(item["scene"], item["size"])
 
-	return false
+func _activate_opening_mode(key: String) -> void:
+	_deactivate_all()
+	if opening_placer != null and opening_placer.has_method("activate"):
+		opening_placer.activate(key)
+
+func _activate_floor_paint_mode() -> void:
+	_deactivate_all()
+	if floor_painter == null or not floor_painter.has_method("activate"):
+		return
+	var mat: Material = RoomSystem.default_floor_material
+	if mat == null:
+		mat = load("res://materials/WallPreview.tres")
+	if mat != null:
+		floor_painter.activate(mat)
+
+func _deactivate_all() -> void:
+	_safe_deactivate(wall_placer)
+	_safe_deactivate(furniture_placer)
+	_safe_deactivate(opening_placer)
+	_safe_deactivate(floor_painter)
+
+func _safe_deactivate(node: Node) -> void:
+	if node != null and node.has_method("deactivate"):
+		node.deactivate()
+
+func _on_floor_changed(_old_floor: int, _new_floor: int) -> void:
+	_update_grid_floor_height()
+
+func _update_grid_floor_height() -> void:
+	if ground_grid == null:
+		return
+	# Keep the grid slightly above the active build floor to avoid z-fighting.
+	var p := ground_grid.position
+	p.y = FloorManager.get_current_y_offset() + 0.01
+	ground_grid.position = p

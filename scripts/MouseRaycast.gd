@@ -12,12 +12,13 @@ func get_world_position_under_mouse() -> Vector3:
 
 	var ray_origin := camera.project_ray_origin(mouse_pos)
 	var ray_dir := camera.project_ray_normal(mouse_pos)
+	var floor_y := FloorManager.get_current_y_offset()
 
-	# Intersect with the y=0 plane (ground level)
+	# Intersect with the active build floor plane.
 	if abs(ray_dir.y) < 0.001:
 		return last_valid_world_pos  # ray is nearly parallel to ground
 
-	var t := -ray_origin.y / ray_dir.y
+	var t := (floor_y - ray_origin.y) / ray_dir.y
 	if t < 0.0:
 		return last_valid_world_pos  # intersection is behind camera
 

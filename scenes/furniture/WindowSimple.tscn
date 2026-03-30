@@ -1,0 +1,47 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_frame"]
+albedo_color = Color(0.9, 0.9, 0.92, 1)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_glass"]
+transparency = 1
+albedo_color = Color(0.62, 0.82, 0.95, 0.35)
+roughness = 0.05
+metallic = 0.0
+
+[sub_resource type="BoxMesh" id="BoxMesh_pane"]
+size = Vector3(0.74, 0.94, 0.03)
+
+[sub_resource type="BoxMesh" id="BoxMesh_frame_vertical"]
+size = Vector3(0.03, 1.0, 0.06)
+
+[sub_resource type="BoxMesh" id="BoxMesh_frame_horizontal"]
+size = Vector3(0.8, 0.03, 0.06)
+
+[node name="WindowSimple" type="Node3D"]
+
+[node name="Pane" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.4, 0)
+mesh = SubResource("BoxMesh_pane")
+surface_material_override/0 = SubResource("StandardMaterial3D_glass")
+
+[node name="FrameLeft" type="MeshInstance3D" parent="."]
+position = Vector3(-0.385, 1.4, 0)
+mesh = SubResource("BoxMesh_frame_vertical")
+surface_material_override/0 = SubResource("StandardMaterial3D_frame")
+
+[node name="FrameRight" type="MeshInstance3D" parent="."]
+position = Vector3(0.385, 1.4, 0)
+mesh = SubResource("BoxMesh_frame_vertical")
+surface_material_override/0 = SubResource("StandardMaterial3D_frame")
+
+[node name="FrameTop" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.885, 0)
+mesh = SubResource("BoxMesh_frame_horizontal")
+surface_material_override/0 = SubResource("StandardMaterial3D_frame")
+
+[node name="FrameBottom" type="MeshInstance3D" parent="."]
+position = Vector3(0, 0.915, 0)
+mesh = SubResource("BoxMesh_frame_horizontal")
+surface_material_override/0 = SubResource("StandardMaterial3D_frame")

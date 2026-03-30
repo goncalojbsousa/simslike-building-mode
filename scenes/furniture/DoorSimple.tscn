@@ -1,0 +1,15 @@
+[gd_scene format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_door"]
+albedo_color = Color(0.44, 0.25, 0.12, 1)
+roughness = 0.85
+
+[sub_resource type="BoxMesh" id="BoxMesh_leaf"]
+size = Vector3(0.86, 2.2, 0.07)
+
+[node name="DoorSimple" type="Node3D"]
+
+[node name="Leaf" type="MeshInstance3D" parent="."]
+position = Vector3(0, 1.1, 0)
+mesh = SubResource("BoxMesh_leaf")
+surface_material_override/0 = SubResource("StandardMaterial3D_door")

@@ -1,0 +1,7 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://cdk2xot185ihk"]
+
+[resource]
+resource_name = "Office_Sh"
+vertex_color_use_as_albedo = true
+albedo_color = Color(0.35419908, 0.1428257, 0.012920001, 1)
+emission_enabled = true
