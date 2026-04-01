@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://dv38aguw2l4cg"]
+
+[ext_resource type="PackedScene" uid="uid://c4ta1tbrbq86l" path="res://assets/meshes/tablet.glb" id="1_rs7fw"]
+
+[node name="tablet" unique_id=164909956 instance=ExtResource("1_rs7fw")]

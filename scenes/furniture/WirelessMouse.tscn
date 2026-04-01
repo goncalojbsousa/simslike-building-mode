@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://ba8irme6jfhgq"]
+
+[ext_resource type="PackedScene" uid="uid://lugef6is4axp" path="res://assets/meshes/wireless_mouse.glb" id="1_ughsn"]
+
+[node name="wireless_mouse" unique_id=290033612 instance=ExtResource("1_ughsn")]

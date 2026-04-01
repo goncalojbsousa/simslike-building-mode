@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://cnjgf4837ijgk"]
+
+[ext_resource type="PackedScene" uid="uid://uobwu1p2t0ky" path="res://assets/meshes/lamp_architect.glb" id="1_1qe8o"]
+
+[node name="lamp_architect" unique_id=1758679478 instance=ExtResource("1_1qe8o")]

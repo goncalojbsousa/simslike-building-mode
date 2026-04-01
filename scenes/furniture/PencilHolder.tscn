@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://fmabdsxyosvc"]
+
+[ext_resource type="PackedScene" uid="uid://ctigwfumxpmu0" path="res://assets/meshes/pencil_holder.glb" id="1_0xo3r"]
+
+[node name="pencil_holder" unique_id=274769436 instance=ExtResource("1_0xo3r")]

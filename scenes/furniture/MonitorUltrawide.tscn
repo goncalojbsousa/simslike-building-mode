@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://b3fn2b25p2r7b"]
+
+[ext_resource type="PackedScene" uid="uid://d1gp2xr2awe5s" path="res://assets/meshes/monitor_ultrawide.glb" id="1_8scfk"]
+
+[node name="monitor_ultrawide" unique_id=624119556 instance=ExtResource("1_8scfk")]

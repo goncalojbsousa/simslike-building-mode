@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://dkrmps2r46smy"]
+
+[ext_resource type="PackedScene" uid="uid://w2b47qgcw0an" path="res://assets/meshes/speaker_bookshelf.glb" id="1_1jht1"]
+
+[node name="speaker_bookshelf" unique_id=1663530954 instance=ExtResource("1_1jht1")]

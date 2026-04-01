@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://dw7pkm73dm74c"]
+
+[ext_resource type="PackedScene" uid="uid://duwm3pbi43teq" path="res://assets/meshes/pencil.glb" id="1_suo8j"]
+
+[node name="pencil" unique_id=2051037852 instance=ExtResource("1_suo8j")]

@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://dx66t8qi80enw"]
+
+[ext_resource type="PackedScene" uid="uid://cp7esfljow3a2" path="res://assets/meshes/mug.glb" id="1_nprvk"]
+
+[node name="mug" unique_id=635702816 instance=ExtResource("1_nprvk")]

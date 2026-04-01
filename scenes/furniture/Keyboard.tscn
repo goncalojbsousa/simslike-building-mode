@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://b12cseuuxnbte"]
+
+[ext_resource type="PackedScene" uid="uid://b6xxj0wv2mtut" path="res://assets/meshes/keyboard.glb" id="1_tp6fx"]
+
+[node name="keyboard" unique_id=91435913 instance=ExtResource("1_tp6fx")]

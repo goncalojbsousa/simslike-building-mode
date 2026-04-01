@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://de2o3e0dtb7bq"]
+
+[ext_resource type="PackedScene" uid="uid://c4dyhr5n534kt" path="res://assets/meshes/printer_big.glb" id="1_lwxp4"]
+
+[node name="printer_big" unique_id=853665039 instance=ExtResource("1_lwxp4")]

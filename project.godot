@@ -28,6 +28,7 @@ RoomSystem="*uid://fiysapuhvtdn"
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
+window/size/mode=2
 
 [physics]
 

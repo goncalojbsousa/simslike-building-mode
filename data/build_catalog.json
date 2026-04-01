@@ -1,0 +1,351 @@
+{
+	"categories": [
+		{
+			"id": "walls",
+			"label": "Walls",
+			"description": "Draw, delete, and box walls.",
+			"mode": "wall",
+			"items": []
+		},
+		{
+			"id": "furniture",
+			"label": "Furniture",
+			"description": "Place furniture objects on the grid.",
+			"mode": "furniture",
+			"default_item_id": "desk",
+			"items": [
+				{
+					"id": "desk",
+					"label": "Desk",
+					"description": "Office desk (1x2). Press R to rotate.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/Desk.tscn",
+						"size": [
+							1,
+							2
+						]
+					}
+				},
+				{
+					"id": "desk_corner",
+					"label": "Desk Corner",
+					"description": "Corner office desk.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/DeskCorner.tscn",
+						"size": [
+							2,
+							2
+						]
+					}
+				},
+				{
+					"id": "office_chair",
+					"label": "Office Chair",
+					"description": "Rolling office chair.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/OfficeChair.tscn",
+						"size": [
+							1,
+							1
+						]
+					}
+				},
+				{
+					"id": "mini_pc",
+					"label": "Mini PC",
+					"description": "Small desktop computer unit.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/MiniPC.tscn",
+						"size": [
+							1,
+							1
+						]
+					}
+				},
+				{
+					"id": "monitor",
+					"label": "Monitor",
+					"description": "Standard monitor.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/Monitor.tscn",
+						"size": [
+							1,
+							1
+						]
+					}
+				},
+				{
+					"id": "monitor_ultrawide",
+					"label": "Monitor Ultrawide",
+					"description": "Ultrawide monitor.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/MonitorUltrawide.tscn",
+						"size": [
+							2,
+							1
+						]
+					}
+				},
+				{
+					"id": "keyboard",
+					"label": "Keyboard",
+					"description": "Standard keyboard.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/Keyboard.tscn",
+						"size": [
+							1,
+							1
+						]
+					}
+				},
+				{
+					"id": "keyboard_slim",
+					"label": "Keyboard Slim",
+					"description": "Slim keyboard.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/KeyboardSlim.tscn",
+						"size": [
+							1,
+							1
+						]
+					}
+				},
+				{
+					"id": "wireless_mouse",
+					"label": "Wireless Mouse",
+					"description": "Wireless mouse.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/WirelessMouse.tscn",
+						"size": [
+							1,
+							1
+						]
+					}
+				},
+				{
+					"id": "laptop",
+					"label": "Laptop",
+					"description": "Laptop computer.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/Laptop.tscn",
+						"size": [
+							1,
+							1
+						]
+					}
+				},
+				{
+					"id": "tablet",
+					"label": "Tablet",
+					"description": "Tablet device.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/Tablet.tscn",
+						"size": [
+							1,
+							1
+						]
+					}
+				},
+				{
+					"id": "camera",
+					"label": "Camera",
+					"description": "Camera device.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/Camera.tscn",
+						"size": [
+							1,
+							1
+						]
+					}
+				},
+				{
+					"id": "lamp",
+					"label": "Lamp",
+					"description": "Desk lamp.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/Lamp.tscn",
+						"size": [
+							1,
+							1
+						]
+					}
+				},
+				{
+					"id": "lamp_architect",
+					"label": "Lamp Architect",
+					"description": "Adjustable architect lamp.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/LampArchitect.tscn",
+						"size": [
+							1,
+							1
+						]
+					}
+				},
+				{
+					"id": "mic",
+					"label": "Mic",
+					"description": "Boom microphone.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/Mic.tscn",
+						"size": [
+							1,
+							1
+						]
+					}
+				},
+				{
+					"id": "mic_desktop",
+					"label": "Mic Desktop",
+					"description": "Desktop microphone.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/MicDesktop.tscn",
+						"size": [
+							1,
+							1
+						]
+					}
+				},
+				{
+					"id": "speaker_desktop",
+					"label": "Speaker Desktop",
+					"description": "Desktop speaker.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/SpeakerDesktop.tscn",
+						"size": [
+							1,
+							1
+						]
+					}
+				},
+				{
+					"id": "speaker_bookshelf",
+					"label": "Speaker Bookshelf",
+					"description": "Bookshelf speaker.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/SpeakerBookshelf.tscn",
+						"size": [
+							1,
+							2
+						]
+					}
+				},
+				{
+					"id": "printer_desktop",
+					"label": "Printer Desktop",
+					"description": "Desktop printer.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/PrinterDesktop.tscn",
+						"size": [
+							1,
+							1
+						]
+					}
+				},
+				{
+					"id": "printer_big",
+					"label": "Printer Big",
+					"description": "Large office printer.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/Printer_Big.tscn",
+						"size": [
+							2,
+							1
+						]
+					}
+				},
+				{
+					"id": "mug",
+					"label": "Mug",
+					"description": "Coffee mug.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/Mug.tscn",
+						"size": [
+							1,
+							1
+						]
+					}
+				},
+				{
+					"id": "pencil_holder",
+					"label": "Pencil Holder",
+					"description": "Desk pencil holder.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/PencilHolder.tscn",
+						"size": [
+							1,
+							1
+						]
+					}
+				},
+				{
+					"id": "pencil",
+					"label": "Pencil",
+					"description": "Pencil.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/Pencil.tscn",
+						"size": [
+							1,
+							1
+						]
+					}
+				},
+				{
+					"id": "pen",
+					"label": "Pen",
+					"description": "Pen.",
+					"payload": {
+						"scene_path": "res://scenes/furniture/Pen.tscn",
+						"size": [
+							1,
+							1
+						]
+					}
+				}
+			]
+		},
+		{
+			"id": "openings",
+			"label": "Openings",
+			"description": "Doors and windows for existing walls.",
+			"mode": "opening",
+			"default_item_id": "door",
+			"items": [
+				{
+					"id": "door",
+					"label": "Door",
+					"description": "Place a door on a wall segment.",
+					"payload": {
+						"opening_key": "door"
+					}
+				},
+				{
+					"id": "window",
+					"label": "Window",
+					"description": "Place a window on a wall segment.",
+					"payload": {
+						"opening_key": "window"
+					}
+				}
+			]
+		},
+		{
+			"id": "floor_paint",
+			"label": "Floor Paint",
+			"description": "Paint floor tiles.",
+			"mode": "floor_paint",
+			"default_item_id": "default_floor",
+			"items": [
+				{
+					"id": "default_floor",
+					"label": "Default",
+					"description": "Paint using the current default room material.",
+					"payload": {
+						"use_room_default": true,
+						"material_path": "res://materials/WallPreview.tres"
+					}
+				}
+			]
+		}
+	]
+}

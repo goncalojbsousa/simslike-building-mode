@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://foqc3d03ctyt"]
+
+[ext_resource type="PackedScene" uid="uid://d0b1wxw71b617" path="res://assets/meshes/printer_desktop.glb" id="1_m7v7w"]
+
+[node name="printer_desktop" unique_id=604160923 instance=ExtResource("1_m7v7w")]

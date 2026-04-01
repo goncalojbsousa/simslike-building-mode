@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://cdxshey6v5ws5"]
+
+[ext_resource type="PackedScene" uid="uid://cwvdosgcp2a2n" path="res://assets/meshes/camera.glb" id="1_e6e23"]
+
+[node name="camera" unique_id=720208231 instance=ExtResource("1_e6e23")]

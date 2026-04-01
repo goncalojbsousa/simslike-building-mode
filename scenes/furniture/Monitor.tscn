@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://cunqfsp2bgsyr"]
+
+[ext_resource type="PackedScene" uid="uid://t5ar32apvikk" path="res://assets/meshes/monitor.glb" id="1_87qyh"]
+
+[node name="monitor" unique_id=841994673 instance=ExtResource("1_87qyh")]

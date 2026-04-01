@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://cyviil6knkcat" path="res://scenes/main/Main.gd" id="1_1rhdn"]
 [ext_resource type="Shader" uid="uid://m8fivrx7djhv" path="res://materials/GridMaterial.gdshader" id="1_u1xfj"]
+[ext_resource type="PackedScene" uid="uid://bdeolllyekxwh" path="res://scenes/ui/BuildModeUI.tscn" id="2_3km4f"]
 [ext_resource type="PackedScene" uid="uid://dgep2mlm12hr0" path="res://scenes/camera/CameraRig.tscn" id="2_nha0i"]
 [ext_resource type="Script" uid="uid://c777cdmfeloxm" path="res://scripts/MouseRaycast.gd" id="3_q24mn"]
 [ext_resource type="Script" uid="uid://bs7ypee2pc7p7" path="res://scripts/WallPlacer.gd" id="4_dc040"]
@@ -27,6 +28,10 @@ albedo_color = Color(0.286275, 0.529412, 0.25098, 1)
 
 [node name="Main" type="Node3D" unique_id=534080925]
 script = ExtResource("1_1rhdn")
+
+[node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=938985616]
+
+[node name="BuildModeUi" parent="CanvasLayer" unique_id=1847549497 instance=ExtResource("2_3km4f")]
 
 [node name="Ground" type="MeshInstance3D" parent="." unique_id=538603552]
 mesh = SubResource("PlaneMesh_vyk5b")

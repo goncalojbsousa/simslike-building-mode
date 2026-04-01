@@ -1,0 +1,108 @@
+[gd_scene format=3 uid="uid://bdeolllyekxwh"]
+
+[ext_resource type="Script" path="res://scenes/ui/BuildModeUI.gd" id="1_bmui"]
+
+[node name="BuildModeUi" type="Control" unique_id=969958903]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+script = ExtResource("1_bmui")
+catalog_path = "res://data/build_catalog.json"
+
+[node name="FooterPanel" type="PanelContainer" parent="." unique_id=826153913]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -260.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="RootMargin" type="MarginContainer" parent="FooterPanel" unique_id=107001]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 10
+
+[node name="RootVBox" type="VBoxContainer" parent="FooterPanel/RootMargin" unique_id=107002]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TopBar" type="HBoxContainer" parent="FooterPanel/RootMargin/RootVBox" unique_id=107003]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="CategoryTabs" type="HBoxContainer" parent="FooterPanel/RootMargin/RootVBox/TopBar" unique_id=107004]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="Spacer" type="Control" parent="FooterPanel/RootMargin/RootVBox/TopBar" unique_id=107005]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="FloorDownButton" type="Button" parent="FooterPanel/RootMargin/RootVBox/TopBar" unique_id=107006]
+layout_mode = 2
+custom_minimum_size = Vector2(44, 36)
+text = "-"
+
+[node name="FloorLabel" type="Label" parent="FooterPanel/RootMargin/RootVBox/TopBar" unique_id=107007]
+layout_mode = 2
+custom_minimum_size = Vector2(96, 0)
+horizontal_alignment = 1
+text = "Floor 0"
+
+[node name="FloorUpButton" type="Button" parent="FooterPanel/RootMargin/RootVBox/TopBar" unique_id=107008]
+layout_mode = 2
+custom_minimum_size = Vector2(44, 36)
+text = "+"
+
+[node name="UndoButton" type="Button" parent="FooterPanel/RootMargin/RootVBox/TopBar" unique_id=107009]
+layout_mode = 2
+custom_minimum_size = Vector2(68, 36)
+text = "Undo"
+
+[node name="RedoButton" type="Button" parent="FooterPanel/RootMargin/RootVBox/TopBar" unique_id=107010]
+layout_mode = 2
+custom_minimum_size = Vector2(68, 36)
+text = "Redo"
+
+[node name="CatalogPanel" type="PanelContainer" parent="FooterPanel/RootMargin/RootVBox" unique_id=107011]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="CatalogMargin" type="MarginContainer" parent="FooterPanel/RootMargin/RootVBox/CatalogPanel" unique_id=107012]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="CatalogVBox" type="VBoxContainer" parent="FooterPanel/RootMargin/RootVBox/CatalogPanel/CatalogMargin" unique_id=107013]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ModeLabel" type="Label" parent="FooterPanel/RootMargin/RootVBox/CatalogPanel/CatalogMargin/CatalogVBox" unique_id=107014]
+layout_mode = 2
+text = "Mode"
+
+[node name="ItemsScroll" type="ScrollContainer" parent="FooterPanel/RootMargin/RootVBox/CatalogPanel/CatalogMargin/CatalogVBox" unique_id=107015]
+layout_mode = 2
+size_flags_vertical = 3
+vertical_scroll_mode = 2
+
+[node name="ItemsGrid" type="GridContainer" parent="FooterPanel/RootMargin/RootVBox/CatalogPanel/CatalogMargin/CatalogVBox/ItemsScroll" unique_id=107016]
+layout_mode = 2
+size_flags_horizontal = 3
+columns = 6
+
+[node name="ItemDetailLabel" type="Label" parent="FooterPanel/RootMargin/RootVBox/CatalogPanel/CatalogMargin/CatalogVBox" unique_id=107017]
+layout_mode = 2
+autowrap_mode = 2
+text = "Select an item"

@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://b62px086o5rtv"]
+
+[ext_resource type="PackedScene" uid="uid://eeurt2jtf8h" path="res://assets/meshes/laptop.glb" id="1_olh8e"]
+
+[node name="laptop" unique_id=1818831860 instance=ExtResource("1_olh8e")]

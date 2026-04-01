@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://2dy7kw8nyt4u"]
+
+[ext_resource type="PackedScene" uid="uid://dbnqfb3g6a2j8" path="res://assets/meshes/keyboard_slim.glb" id="1_vogbw"]
+
+[node name="keyboard_slim" unique_id=870658095 instance=ExtResource("1_vogbw")]

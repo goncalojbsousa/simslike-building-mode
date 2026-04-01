@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://btfysf7tt100b"]
+
+[ext_resource type="PackedScene" uid="uid://clgn48i45dhik" path="res://assets/meshes/mini_pc.glb" id="1_tmkwr"]
+
+[node name="mini_pc" unique_id=471440736 instance=ExtResource("1_tmkwr")]
