@@ -9,6 +9,9 @@ var _room_detector: Node = null
 var _room_detection_dirty: bool = false
 var _room_detection_scheduled: bool = false
 var _room_batch_depth: int = 0
+var _room_identity_counter: int = 1
+var _room_entries_by_floor: Dictionary = {}   # floor -> Array[{id, signature, tiles: Dictionary}]
+var _wall_identities: Dictionary = {}          # wall_key -> Dictionary
 
 const ROOM_DETECTOR_SCRIPT := preload("res://scripts/RoomDetector.gd")
 const UPPER_FLOOR_OVERHANG_CELLS := 2
@@ -16,6 +19,7 @@ const UPPER_FLOOR_OVERHANG_CELLS := 2
 # --- Signals ---
 signal wall_placed(from_tile: Vector2i, to_tile: Vector2i, floor: int)
 signal wall_removed(from_tile: Vector2i, to_tile: Vector2i, floor: int)
+signal wall_identities_changed
 
 # --- WallData ---
 class WallData:
@@ -246,17 +250,168 @@ func _update_room_detection() -> void:
 	if _room_detector == null:
 		return
 
-	var rooms: Array = _room_detector.call("detect_all_rooms")
+	var floors: Dictionary = {}
+	for key in _walls.keys():
+		floors[get_floor_from_key(key)] = true
+
+	var next_entries_by_floor: Dictionary = {}
 	var current_signatures: Dictionary = {}
 
-	for room in rooms:
-		var signature := _make_room_signature(room)
-		if signature == "":
-			continue
+	for floor_value in floors.keys():
+		var floor_index := int(floor_value)
+		var prev_entries: Array = _room_entries_by_floor.get(floor_index, [])
+		var available_prev: Array = []
+		for prev in prev_entries:
+			available_prev.append(prev)
 
-		current_signatures[signature] = true
+		var new_entries: Array = []
+		var rooms: Array = _room_detector.call("detect_all_rooms_on_floor", floor_index)
+		for room in rooms:
+			if not (room is Array):
+				continue
+			var signature := _make_room_signature(room)
+			if signature == "":
+				continue
 
+			var room_tiles := _array_to_tile_set(room)
+			var matched_prev_idx := _find_best_overlap_prev_index(room_tiles, available_prev)
+			var room_id := -1
+			if matched_prev_idx >= 0:
+				room_id = int((available_prev[matched_prev_idx] as Dictionary).get("id", -1))
+				available_prev.remove_at(matched_prev_idx)
+			else:
+				room_id = _room_identity_counter
+				_room_identity_counter += 1
+
+			new_entries.append({
+				"id": room_id,
+				"signature": signature,
+				"tiles": room_tiles,
+			})
+			current_signatures[signature] = true
+
+		next_entries_by_floor[floor_index] = new_entries
+
+	_room_entries_by_floor = next_entries_by_floor
 	_known_room_signatures = current_signatures
+	_rebuild_wall_identities()
+
+func _array_to_tile_set(room: Array) -> Dictionary:
+	var tile_set: Dictionary = {}
+	for tile in room:
+		if tile is Vector2i:
+			tile_set[tile] = true
+	return tile_set
+
+func _count_overlap(a: Dictionary, b: Dictionary) -> int:
+	var overlap := 0
+	for tile in a.keys():
+		if b.has(tile):
+			overlap += 1
+	return overlap
+
+func _find_best_overlap_prev_index(room_tiles: Dictionary, prev_entries: Array) -> int:
+	var best_idx := -1
+	var best_overlap := 0
+	for i in range(prev_entries.size()):
+		var prev: Dictionary = prev_entries[i]
+		var prev_tiles: Dictionary = prev.get("tiles", {})
+		var overlap := _count_overlap(room_tiles, prev_tiles)
+		if overlap > best_overlap:
+			best_overlap = overlap
+			best_idx = i
+	return best_idx
+
+func _get_room_entry_for_tile(tile: Vector2i, floor_index: int) -> Dictionary:
+	var entries: Array = _room_entries_by_floor.get(floor_index, [])
+	for entry in entries:
+		var tiles: Dictionary = (entry as Dictionary).get("tiles", {})
+		if tiles.has(tile):
+			return entry
+	return {}
+
+func _compute_wall_side_tiles(from_tile: Vector2i, to_tile: Vector2i) -> Dictionary:
+	var diff := to_tile - from_tile
+	if abs(diff.x) == 1:
+		var min_x := mini(from_tile.x, to_tile.x)
+		var y := from_tile.y
+		return {
+			"orientation": "vertical",
+			"front_tile": Vector2i(min_x, y),
+			"back_tile": Vector2i(min_x + 1, y),
+		}
+
+	var x := from_tile.x
+	var min_y := mini(from_tile.y, to_tile.y)
+	return {
+		"orientation": "horizontal",
+		"front_tile": Vector2i(x, min_y),
+		"back_tile": Vector2i(x, min_y + 1),
+	}
+
+func _make_wall_side_info(tile: Vector2i, floor_index: int) -> Dictionary:
+	var entry := _get_room_entry_for_tile(tile, floor_index)
+	if entry.is_empty():
+		return {
+			"tile": tile,
+			"room_id": -1,
+			"room_signature": "exterior",
+		}
+	return {
+		"tile": tile,
+		"room_id": int(entry.get("id", -1)),
+		"room_signature": str(entry.get("signature", "exterior")),
+	}
+
+func _rebuild_wall_identities() -> void:
+	_wall_identities.clear()
+	for key in _walls.keys():
+		var wall: WallData = _walls[key]
+		if wall == null:
+			continue
+		var floor_index := get_floor_from_key(key)
+		var side_tiles := _compute_wall_side_tiles(wall.from_tile, wall.to_tile)
+		var front_tile: Vector2i = side_tiles["front_tile"]
+		var back_tile: Vector2i = side_tiles["back_tile"]
+		var front_side := _make_wall_side_info(front_tile, floor_index)
+		var back_side := _make_wall_side_info(back_tile, floor_index)
+
+		_wall_identities[key] = {
+			"key": key,
+			"floor": floor_index,
+			"orientation": str(side_tiles["orientation"]),
+			"from_tile": wall.from_tile,
+			"to_tile": wall.to_tile,
+			"front_side": front_side,
+			"back_side": back_side,
+			"separates": {
+				"a": front_side.get("room_id", -1),
+				"b": back_side.get("room_id", -1),
+			},
+		}
+
+	wall_identities_changed.emit()
+
+func get_wall_identity_by_key(key: String) -> Dictionary:
+	return _wall_identities.get(key, {})
+
+func get_wall_identities_for_floor(floor_index: int) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for key in _wall_identities.keys():
+		var identity: Dictionary = _wall_identities[key]
+		if int(identity.get("floor", -1)) == floor_index:
+			result.append(identity)
+	return result
+
+func get_room_entries_for_floor(floor_index: int) -> Array:
+	return _room_entries_by_floor.get(floor_index, [])
+
+func get_room_id_for_tile(tile: Vector2i, floor_index: int = -1) -> int:
+	var f := floor_index if floor_index >= 0 else FloorManager.current_floor
+	var entry := _get_room_entry_for_tile(tile, f)
+	if entry.is_empty():
+		return -1
+	return int(entry.get("id", -1))
 
 func _make_room_signature(room: Array) -> String:
 	var cells: Array[String] = []

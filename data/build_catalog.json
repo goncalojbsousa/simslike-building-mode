@@ -8,6 +8,13 @@
 			"items": []
 		},
 		{
+			"id": "room_edit",
+			"label": "Rooms",
+			"description": "Select, move, and resize enclosed rooms.",
+			"mode": "room_edit",
+			"items": []
+		},
+		{
 			"id": "furniture",
 			"label": "Furniture",
 			"description": "Place furniture objects on the grid.",

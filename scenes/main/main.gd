@@ -5,6 +5,7 @@ extends Node3D
 @onready var furniture_placer: Node = get_node_or_null("FurniturePlacer")
 @onready var opening_placer: Node = get_node_or_null("OpeningPlacer")
 @onready var floor_painter: Node = get_node_or_null("FloorPainter")
+@onready var room_editor: Node = get_node_or_null("RoomEditor")
 @onready var ground_grid: Node3D = get_node_or_null("Ground") as Node3D
 @onready var build_mode_ui: Control = get_node_or_null("CanvasLayer/BuildModeUi") as Control
 
@@ -66,6 +67,8 @@ func _on_ui_mode_requested(mode: String, payload: Dictionary) -> void:
 			_activate_opening_from_payload(payload)
 		"floor_paint":
 			_activate_floor_paint_from_payload(payload)
+		"room_edit":
+			_activate_room_edit_mode()
 
 func _on_ui_floor_up_requested() -> void:
 	FloorManager.go_up()
@@ -146,11 +149,17 @@ func _activate_floor_paint_from_payload(payload: Dictionary) -> void:
 	if mat != null:
 		floor_painter.activate(mat)
 
+func _activate_room_edit_mode() -> void:
+	_deactivate_all()
+	if room_editor != null and room_editor.has_method("activate"):
+		room_editor.activate()
+
 func _deactivate_all() -> void:
 	_safe_deactivate(wall_placer)
 	_safe_deactivate(furniture_placer)
 	_safe_deactivate(opening_placer)
 	_safe_deactivate(floor_painter)
+	_safe_deactivate(room_editor)
 
 func _safe_deactivate(node: Node) -> void:
 	if node != null and node.has_method("deactivate"):

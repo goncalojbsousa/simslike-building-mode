@@ -10,6 +10,7 @@
 [ext_resource type="Script" uid="uid://ck1oc5y3r3014" path="res://scripts/FurniturePlacer.gd" id="6_sjxhf"]
 [ext_resource type="Script" uid="uid://dcxpl1txm5ner" path="res://scripts/OpeningPlacer.gd" id="7_n8skm"]
 [ext_resource type="Script" uid="uid://1lys5byust2m" path="res://scripts/FloorPainter.gd" id="8_hf7ee"]
+[ext_resource type="Script" path="res://scripts/RoomEditor.gd" id="9_7c60v"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_vyk5b"]
 size = Vector2(100, 100)
@@ -62,6 +63,10 @@ mouse_raycast = NodePath("../MouseRaycast")
 
 [node name="FloorPainter" type="Node" parent="." unique_id=211483337 node_paths=PackedStringArray("mouse_raycast")]
 script = ExtResource("8_hf7ee")
+mouse_raycast = NodePath("../MouseRaycast")
+
+[node name="RoomEditor" type="Node" parent="." node_paths=PackedStringArray("mouse_raycast")]
+script = ExtResource("9_7c60v")
 mouse_raycast = NodePath("../MouseRaycast")
 
 [node name="WallContainer" type="Node3D" parent="." unique_id=982250955]

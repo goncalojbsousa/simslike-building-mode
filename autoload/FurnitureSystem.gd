@@ -122,6 +122,79 @@ func _all_placements() -> Array:
 	result.append_array(_free_placements)
 	return result
 
+func get_object_node_ids_in_tiles(tile_set: Dictionary) -> Array[int]:
+	var ids_lookup: Dictionary = {}
+	for placement in _all_placements():
+		if placement == null or not is_instance_valid(placement.node):
+			continue
+		var world_tile := GridManager.world_to_tile(placement.node.global_position)
+		if not tile_set.has(world_tile):
+			continue
+		ids_lookup[placement.node.get_instance_id()] = true
+
+	var ids: Array[int] = []
+	for id_value in ids_lookup.keys():
+		ids.append(int(id_value))
+	return ids
+
+func _translate_grid_placement(tile_key: Vector2i, placement: FurniturePlacement, delta_tiles: Vector2i) -> bool:
+	if placement == null or not is_instance_valid(placement.node):
+		return false
+
+	if placement.uses_grid_occupancy:
+		var old_occupied := _get_occupied_tiles(placement.tile, placement.size, placement.rotation_index)
+		for t in old_occupied:
+			GridManager.set_tile_occupied(t, false)
+
+	placement.tile += delta_tiles
+	placement.node.global_position += Vector3(delta_tiles.x * GridManager.TILE_SIZE, 0.0, delta_tiles.y * GridManager.TILE_SIZE)
+
+	if placement.uses_grid_occupancy:
+		var new_occupied := _get_occupied_tiles(placement.tile, placement.size, placement.rotation_index)
+		for t in new_occupied:
+			GridManager.set_tile_occupied(t, true)
+
+	_placed.erase(tile_key)
+	_placed[placement.tile] = placement
+	return true
+
+func _translate_free_placement(index: int, placement: FurniturePlacement, delta_tiles: Vector2i) -> bool:
+	if index < 0 or index >= _free_placements.size():
+		return false
+	if placement == null or not is_instance_valid(placement.node):
+		return false
+
+	placement.tile += delta_tiles
+	placement.node.global_position += Vector3(delta_tiles.x * GridManager.TILE_SIZE, 0.0, delta_tiles.y * GridManager.TILE_SIZE)
+	_free_placements[index] = placement
+	return true
+
+func _translate_object_by_node_id(node_id: int, delta_tiles: Vector2i) -> bool:
+	for tile_value in _placed.keys():
+		var tile: Vector2i = tile_value
+		var placement: FurniturePlacement = _placed[tile]
+		if placement == null or not is_instance_valid(placement.node):
+			continue
+		if placement.node.get_instance_id() != node_id:
+			continue
+		return _translate_grid_placement(tile, placement, delta_tiles)
+
+	for i in range(_free_placements.size()):
+		var free_placement: FurniturePlacement = _free_placements[i]
+		if free_placement == null or not is_instance_valid(free_placement.node):
+			continue
+		if free_placement.node.get_instance_id() != node_id:
+			continue
+		return _translate_free_placement(i, free_placement, delta_tiles)
+
+	return false
+
+func translate_objects_by_node_ids(node_ids: Array[int], delta_tiles: Vector2i) -> void:
+	if delta_tiles == Vector2i.ZERO:
+		return
+	for node_id in node_ids:
+		_translate_object_by_node_id(int(node_id), delta_tiles)
+
 func _overlaps_existing_furniture(
 		world_pos: Vector3,
 		size: Vector2i,
@@ -223,6 +296,89 @@ func _wall_half_extents_from_tiles(from_tile: Vector2i, to_tile: Vector2i) -> Ve
 		return Vector2(0.08, GridManager.TILE_SIZE * 0.5)
 	# Shared horizontal edge (parallel to X)
 	return Vector2(GridManager.TILE_SIZE * 0.5, 0.08)
+
+func _make_snapshot(placement: FurniturePlacement) -> Dictionary:
+	if placement == null or not is_instance_valid(placement.node):
+		return {}
+	return {
+		"node_id": placement.node.get_instance_id(),
+		"tile": placement.tile,
+		"scene_path": placement.scene_path,
+		"rotation_index": placement.rotation_index,
+		"size": placement.size,
+		"uses_grid_occupancy": placement.uses_grid_occupancy,
+		"world_pos": placement.node.global_position,
+	}
+
+func get_snapshots_blocking_wall(from_tile: Vector2i, to_tile: Vector2i) -> Array[Dictionary]:
+	var snapshots: Array[Dictionary] = []
+	var wall_a: Vector3 = GridManager.tile_to_world(from_tile)
+	var wall_b: Vector3 = GridManager.tile_to_world(to_tile)
+	var wall_center := Vector2((wall_a.x + wall_b.x) * 0.5, (wall_a.z + wall_b.z) * 0.5)
+	var wall_half := _wall_half_extents_from_tiles(from_tile, to_tile)
+
+	for placement in _all_placements():
+		if placement == null or not is_instance_valid(placement.node):
+			continue
+		var furniture_half := _placement_half_extents(placement)
+		var furniture_center := Vector2(placement.node.global_position.x, placement.node.global_position.z)
+		if not _rects_overlap(furniture_center, furniture_half, wall_center, wall_half):
+			continue
+		var snapshot := _make_snapshot(placement)
+		if not snapshot.is_empty():
+			snapshots.append(snapshot)
+
+	return snapshots
+
+func _remove_by_node_id(node_id: int) -> bool:
+	for tile_value in _placed.keys():
+		var tile: Vector2i = tile_value
+		var placement: FurniturePlacement = _placed[tile]
+		if placement == null or not is_instance_valid(placement.node):
+			continue
+		if placement.node.get_instance_id() == node_id:
+			return remove_furniture_at_tile(tile)
+
+	for i in range(_free_placements.size()):
+		var placement: FurniturePlacement = _free_placements[i]
+		if placement == null or not is_instance_valid(placement.node):
+			continue
+		if placement.node.get_instance_id() != node_id:
+			continue
+		var removed: FurniturePlacement = _free_placements[i]
+		if is_instance_valid(removed.node):
+			removed.node.queue_free()
+		_free_placements.remove_at(i)
+		furniture_removed.emit(removed.tile)
+		return true
+
+	return false
+
+func handle_invalid_snapshot(snapshot: Dictionary) -> bool:
+	# Single hook used by RoomEditor. Replace this method with inventory storage in the future.
+	if snapshot.is_empty():
+		return false
+	if not snapshot.has("node_id"):
+		return false
+	return _remove_by_node_id(int(snapshot["node_id"]))
+
+func restore_snapshot(snapshot: Dictionary, container: Node3D = null) -> bool:
+	if snapshot.is_empty():
+		return false
+	if not snapshot.has("scene_path"):
+		return false
+
+	var tile: Vector2i = snapshot.get("tile", Vector2i.ZERO)
+	var world_pos: Vector3 = snapshot.get("world_pos", Vector3.ZERO)
+	var rotation_index := int(snapshot.get("rotation_index", 0))
+	var scene_path := str(snapshot.get("scene_path", ""))
+	var size: Vector2i = snapshot.get("size", Vector2i.ONE)
+	var uses_grid := bool(snapshot.get("uses_grid_occupancy", true))
+
+	if scene_path == "":
+		return false
+
+	return place_furniture_at(tile, world_pos, rotation_index, scene_path, size, container, uses_grid)
 
 func _get_occupied_tiles(origin: Vector2i, size: Vector2i, rotation_index: int) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
