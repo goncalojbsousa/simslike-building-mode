@@ -337,19 +337,87 @@
 			]
 		},
 		{
-			"id": "floor_paint",
-			"label": "Floor Paint",
-			"description": "Paint floor tiles.",
-			"mode": "floor_paint",
-			"default_item_id": "default_floor",
+			"id": "wall_paint",
+			"label": "Wall Paint",
+			"description": "Paint wall sides. Hold Shift to paint the whole room side.",
+			"mode": "wall_paint",
+			"default_item_id": "wall_warm",
 			"items": [
 				{
-					"id": "default_floor",
-					"label": "Default",
-					"description": "Paint using the current default room material.",
+					"id": "wall_warm",
+					"label": "Warm",
+					"description": "Warm plaster tone for walls.",
 					"payload": {
-						"use_room_default": true,
-						"material_path": "res://materials/WallPreview.tres"
+						"color": [0.88, 0.86, 0.82, 1.0]
+					}
+				},
+				{
+					"id": "wall_white",
+					"label": "White",
+					"description": "Clean white wall paint.",
+					"payload": {
+						"color": [0.95, 0.95, 0.95, 1.0]
+					}
+				},
+				{
+					"id": "wall_blue",
+					"label": "Sky Blue",
+					"description": "Soft sky blue wall color.",
+					"payload": {
+						"color": [0.66, 0.78, 0.92, 1.0]
+					}
+				},
+				{
+					"id": "wall_green",
+					"label": "Sage",
+					"description": "Muted sage wall color.",
+					"payload": {
+						"color": [0.62, 0.75, 0.64, 1.0]
+					}
+				}
+			]
+		},
+		{
+			"id": "floor_paint",
+			"label": "Floor Paint",
+			"description": "Paint floor tiles. Hold Shift to paint the entire floor.",
+			"mode": "floor_paint",
+			"default_item_id": "floor_oak",
+			"items": [
+				{
+					"id": "floor_oak",
+					"label": "Oak",
+					"description": "Warm oak floor tone.",
+					"payload": {
+						"use_room_default": false,
+						"color": [0.64, 0.56, 0.46, 1.0]
+					}
+				},
+				{
+					"id": "floor_beige",
+					"label": "Beige",
+					"description": "Light beige floor tone.",
+					"payload": {
+						"use_room_default": false,
+						"color": [0.78, 0.72, 0.60, 1.0]
+					}
+				},
+				{
+					"id": "floor_gray",
+					"label": "Stone Gray",
+					"description": "Cool gray floor tone.",
+					"payload": {
+						"use_room_default": false,
+						"color": [0.55, 0.57, 0.58, 1.0]
+					}
+				},
+				{
+					"id": "floor_terracotta",
+					"label": "Terracotta",
+					"description": "Warm terracotta floor tone.",
+					"payload": {
+						"use_room_default": false,
+						"color": [0.69, 0.46, 0.33, 1.0]
 					}
 				}
 			]

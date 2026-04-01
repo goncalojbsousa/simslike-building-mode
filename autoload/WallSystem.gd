@@ -12,14 +12,17 @@ var _room_batch_depth: int = 0
 var _room_identity_counter: int = 1
 var _room_entries_by_floor: Dictionary = {}   # floor -> Array[{id, signature, tiles: Dictionary}]
 var _wall_identities: Dictionary = {}          # wall_key -> Dictionary
+var _wall_side_colors: Dictionary = {}         # wall_key -> {front: Color, back: Color}
 
 const ROOM_DETECTOR_SCRIPT := preload("res://scripts/RoomDetector.gd")
 const UPPER_FLOOR_OVERHANG_CELLS := 2
+const DEFAULT_WALL_COLOR := Color(0.88, 0.86, 0.82, 1.0)
 
 # --- Signals ---
 signal wall_placed(from_tile: Vector2i, to_tile: Vector2i, floor: int)
 signal wall_removed(from_tile: Vector2i, to_tile: Vector2i, floor: int)
 signal wall_identities_changed
+signal wall_side_color_changed(wall_key: String)
 
 # --- WallData ---
 class WallData:
@@ -237,6 +240,8 @@ func remove_wall(a: Vector2i, b: Vector2i, floor_index: int = -1) -> bool:
 	if not _walls.has(key):
 		return false
 	_walls.erase(key)
+	_wall_side_colors.erase(key)
+	wall_side_color_changed.emit(key)
 	# Also remove any opening on this wall.
 	var opening_system := _opening_system()
 	if opening_system != null and opening_system.has_method("has_opening"):
@@ -412,6 +417,56 @@ func get_room_id_for_tile(tile: Vector2i, floor_index: int = -1) -> int:
 	if entry.is_empty():
 		return -1
 	return int(entry.get("id", -1))
+
+func get_room_tiles_by_id(room_id: int, floor_index: int = -1) -> Dictionary:
+	var f := floor_index if floor_index >= 0 else FloorManager.current_floor
+	for entry in get_room_entries_for_floor(f):
+		var room_entry := entry as Dictionary
+		if int(room_entry.get("id", -1)) != room_id:
+			continue
+		var tiles: Dictionary = room_entry.get("tiles", {})
+		return tiles.duplicate(true)
+	return {}
+
+func get_default_wall_color() -> Color:
+	return DEFAULT_WALL_COLOR
+
+func get_wall_colors_by_key(key: String) -> Dictionary:
+	var entry: Dictionary = _wall_side_colors.get(key, {})
+	return {
+		"front": entry.get("front", DEFAULT_WALL_COLOR),
+		"back": entry.get("back", DEFAULT_WALL_COLOR),
+	}
+
+func get_wall_side_color_by_key(key: String, side: String) -> Color:
+	if side != "front" and side != "back":
+		return DEFAULT_WALL_COLOR
+	var entry: Dictionary = _wall_side_colors.get(key, {})
+	return entry.get(side, DEFAULT_WALL_COLOR)
+
+func set_wall_side_color_by_key(key: String, side: String, color: Color) -> void:
+	if side != "front" and side != "back":
+		return
+	if not _walls.has(key):
+		return
+	var entry: Dictionary = _wall_side_colors.get(key, {})
+	if entry.get(side, DEFAULT_WALL_COLOR) == color:
+		return
+	entry[side] = color
+	_wall_side_colors[key] = entry
+	wall_side_color_changed.emit(key)
+
+func set_wall_colors_by_key(key: String, front_color: Color, back_color: Color) -> void:
+	if not _walls.has(key):
+		return
+	var next_entry := {
+		"front": front_color,
+		"back": back_color,
+	}
+	if _wall_side_colors.get(key, {}) == next_entry:
+		return
+	_wall_side_colors[key] = next_entry
+	wall_side_color_changed.emit(key)
 
 func _make_room_signature(room: Array) -> String:
 	var cells: Array[String] = []

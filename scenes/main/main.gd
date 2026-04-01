@@ -2,6 +2,7 @@
 extends Node3D
 
 @onready var wall_placer: Node = get_node_or_null("WallPlacer")
+@onready var wall_painter: Node = get_node_or_null("WallPainter")
 @onready var furniture_placer: Node = get_node_or_null("FurniturePlacer")
 @onready var opening_placer: Node = get_node_or_null("OpeningPlacer")
 @onready var floor_painter: Node = get_node_or_null("FloorPainter")
@@ -65,6 +66,8 @@ func _on_ui_mode_requested(mode: String, payload: Dictionary) -> void:
 			_activate_furniture_from_payload(payload)
 		"opening":
 			_activate_opening_from_payload(payload)
+		"wall_paint":
+			_activate_wall_paint_from_payload(payload)
 		"floor_paint":
 			_activate_floor_paint_from_payload(payload)
 		"room_edit":
@@ -138,6 +141,17 @@ func _activate_floor_paint_from_payload(payload: Dictionary) -> void:
 	if mat == null and payload.has("material") and payload["material"] is Material:
 		mat = payload["material"]
 
+	if mat == null and payload.has("color") and payload["color"] is Array:
+		var color_arr: Array = payload["color"]
+		if color_arr.size() >= 3 and RoomSystem != null and RoomSystem.has_method("create_tinted_floor_material"):
+			var color := Color(
+				float(color_arr[0]),
+				float(color_arr[1]),
+				float(color_arr[2]),
+				float(color_arr[3]) if color_arr.size() > 3 else 1.0
+			)
+			mat = RoomSystem.create_tinted_floor_material(color)
+
 	if mat == null and payload.has("material_path"):
 		var loaded := load(str(payload.get("material_path", "")))
 		if loaded is Material:
@@ -149,6 +163,24 @@ func _activate_floor_paint_from_payload(payload: Dictionary) -> void:
 	if mat != null:
 		floor_painter.activate(mat)
 
+func _activate_wall_paint_from_payload(payload: Dictionary) -> void:
+	_deactivate_all()
+	if wall_painter == null or not wall_painter.has_method("activate"):
+		return
+
+	var color := WallSystem.get_default_wall_color()
+	if payload.has("color") and payload["color"] is Array:
+		var color_arr: Array = payload["color"]
+		if color_arr.size() >= 3:
+			color = Color(
+				float(color_arr[0]),
+				float(color_arr[1]),
+				float(color_arr[2]),
+				float(color_arr[3]) if color_arr.size() > 3 else 1.0
+			)
+
+	wall_painter.activate(color)
+
 func _activate_room_edit_mode() -> void:
 	_deactivate_all()
 	if room_editor != null and room_editor.has_method("activate"):
@@ -156,6 +188,7 @@ func _activate_room_edit_mode() -> void:
 
 func _deactivate_all() -> void:
 	_safe_deactivate(wall_placer)
+	_safe_deactivate(wall_painter)
 	_safe_deactivate(furniture_placer)
 	_safe_deactivate(opening_placer)
 	_safe_deactivate(floor_painter)

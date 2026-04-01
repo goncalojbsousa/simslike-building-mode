@@ -1,7 +1,7 @@
 extends Node
 
 # Default floor materials — player can override per-tile via FloorPainter
-@export var default_floor_material: Material = preload("res://materials/WallPreview.tres")
+@export var default_floor_material: Material
 @export var roof_material: Material
 
 # room_meshes[floor][signature] -> {
@@ -11,22 +11,50 @@ extends Node
 # }
 var _room_meshes: Dictionary = {}
 var _fallback_roof_material: StandardMaterial3D = null
+var _shared_floor_texture: NoiseTexture2D = null
 
 # Per-tile material overrides: Dictionary[String -> Material]
 # Key: "x,z,floor"
 var _tile_materials: Dictionary = {}
 
 const ROOF_Z_FIGHT_OFFSET: float = 0.02
+const DEFAULT_FLOOR_COLOR := Color(0.64, 0.56, 0.46, 1.0)
 
 func _ready() -> void:
 	WallSystem.wall_placed.connect(_on_wall_changed)
 	WallSystem.wall_removed.connect(_on_wall_changed)
 	FloorManager.floor_changed.connect(_on_floor_changed)
+	if default_floor_material == null:
+		default_floor_material = create_tinted_floor_material(DEFAULT_FLOOR_COLOR)
 	if roof_material == null:
 		_fallback_roof_material = StandardMaterial3D.new()
 		_fallback_roof_material.albedo_color = Color(0.78, 0.78, 0.78, 1.0)
 		_fallback_roof_material.roughness = 1.0
 		_fallback_roof_material.metallic = 0.0
+
+func _ensure_floor_texture() -> NoiseTexture2D:
+	if _shared_floor_texture != null:
+		return _shared_floor_texture
+	var noise := FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_PERLIN
+	noise.frequency = 2.6
+	noise.fractal_octaves = 4
+	var noise_texture := NoiseTexture2D.new()
+	noise_texture.width = 256
+	noise_texture.height = 256
+	noise_texture.seamless = true
+	noise_texture.noise = noise
+	_shared_floor_texture = noise_texture
+	return _shared_floor_texture
+
+func create_tinted_floor_material(color: Color) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color
+	mat.albedo_texture = _ensure_floor_texture()
+	mat.roughness = 0.96
+	mat.metallic = 0.0
+	mat.uv1_scale = Vector3(1.35, 1.35, 1.35)
+	return mat
 
 func _on_wall_changed(_a: Vector2i, _b: Vector2i, _floor: int) -> void:
 	_rebuild_floor(_floor)
@@ -182,6 +210,17 @@ func get_tile_material(tile: Vector2i, floor_index: int) -> Material:
 	var key := "%d,%d,%d" % [tile.x, tile.y, floor_index]
 	return _tile_materials.get(key, default_floor_material)
 
+func get_all_floor_tiles(floor_index: int = -1) -> Dictionary:
+	var f := floor_index if floor_index >= 0 else FloorManager.current_floor
+	var tiles: Dictionary = {}
+	for room in _detect_rooms_on_floor(f):
+		if not (room is Array):
+			continue
+		for tile in room:
+			if tile is Vector2i:
+				tiles[tile] = true
+	return tiles
+
 func _get_tile_material(tile: Vector2i, floor_index: int) -> Material:
 	return get_tile_material(tile, floor_index)
 
@@ -193,6 +232,15 @@ func set_tile_material(tile: Vector2i, floor_index: int, mat: Material) -> void:
 	var key := "%d,%d,%d" % [tile.x, tile.y, floor_index]
 	_tile_materials[key] = mat
 	# Rebuild the room mesh containing this tile
+	_rebuild_floor(floor_index)
+
+func set_tile_materials_bulk(tile_materials: Dictionary, floor_index: int) -> void:
+	for tile_value in tile_materials.keys():
+		if not (tile_value is Vector2i):
+			continue
+		var tile: Vector2i = tile_value
+		var key := "%d,%d,%d" % [tile.x, tile.y, floor_index]
+		_tile_materials[key] = tile_materials[tile_value]
 	_rebuild_floor(floor_index)
 
 func clear_tile_material(tile: Vector2i, floor_index: int) -> void:
