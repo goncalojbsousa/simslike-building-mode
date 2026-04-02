@@ -6,15 +6,24 @@ extends Node
 @export var active: bool = false
 @export var free_collision_padding: float = 0.03
 
+const MODE_PLACE := 0
+const MODE_DELETE := 1
+const MODE_EDIT := 2
+
 # Set these when player selects a furniture item from the UI
 var current_scene_path: String = ""
 var current_size: Vector2i = Vector2i(1, 1)   # in tiles
 
 # Internal state
-var _rotation_index: int = 0        # 0=0°, 1=90°, 2=180°, 3=270°
-var _free_mode: bool = false         # Alt held
+var _tool_mode: int = MODE_PLACE
+var _rotation_index: int = 0        # 0=0, 1=90, 2=180, 3=270
+var _free_mode: bool = false         # Alt held (place mode)
 var _preview_instance: Node3D = null
 var _preview_valid: bool = false
+
+# Edit-mode selection
+var _selected_snapshot: Dictionary = {}
+var _selected_rotation_index: int = 0
 
 func _resolve_furniture_container() -> Node3D:
 	if is_instance_valid(furniture_container):
@@ -39,13 +48,35 @@ func activate(scene_path: String, size: Vector2i) -> void:
 	current_scene_path = scene_path
 	current_size = size
 	active = true
+	_tool_mode = MODE_PLACE
 	_rotation_index = 0
+	_clear_selected_snapshot()
 	_resolve_furniture_container()
 	_spawn_preview()
 
+func activate_delete_mode() -> void:
+	active = true
+	_tool_mode = MODE_DELETE
+	current_scene_path = ""
+	_rotation_index = 0
+	_clear_selected_snapshot()
+	_resolve_furniture_container()
+	_destroy_preview()
+
+func activate_edit_mode() -> void:
+	active = true
+	_tool_mode = MODE_EDIT
+	current_scene_path = ""
+	_rotation_index = 0
+	_resolve_furniture_container()
+	_destroy_preview()
+	_clear_selected_snapshot()
+
 func deactivate() -> void:
 	active = false
+	_tool_mode = MODE_PLACE
 	_destroy_preview()
+	_clear_selected_snapshot()
 
 # -------------------------------------------------------
 # Input
@@ -62,11 +93,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			deactivate()
 			return
 
-		# R rotates 90°
 		if ke.pressed and ke.keycode == KEY_R:
-			_rotation_index = (_rotation_index + 1) % 4
-			if is_instance_valid(_preview_instance):
-				_preview_instance.rotation_degrees.y = _rotation_index * 90.0
+			if _tool_mode == MODE_PLACE:
+				_rotation_index = (_rotation_index + 1) % 4
+				if is_instance_valid(_preview_instance):
+					_preview_instance.rotation_degrees.y = _rotation_index * 90.0
+			elif _tool_mode == MODE_EDIT:
+				_rotate_selected_furniture()
 
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
@@ -76,15 +109,186 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 
 		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
-			if _preview_valid:
+			if _tool_mode == MODE_DELETE:
+				_delete_furniture_under_cursor()
+			elif _tool_mode == MODE_EDIT:
+				_handle_edit_left_click()
+			elif _preview_valid:
 				_place_furniture()
 
 func _process(_delta: float) -> void:
-	if not active or current_scene_path == "":
+	if not active:
+		return
+	if _tool_mode != MODE_PLACE:
+		return
+	if current_scene_path == "":
 		return
 
 	_free_mode = Input.is_key_pressed(KEY_ALT)
 	_update_preview_position()
+
+# -------------------------------------------------------
+# Edit mode
+# -------------------------------------------------------
+
+func _handle_edit_left_click() -> void:
+	var floor_index : int = int(App.get_floor_service().current_floor)
+	var world_pos: Vector3 = mouse_raycast.get_world_position_under_mouse()
+	var clicked_snapshot: Dictionary = App.get_furniture_service().get_snapshot_at_world(world_pos, floor_index)
+
+	if _selected_snapshot.is_empty():
+		if clicked_snapshot.is_empty():
+			return
+		_set_selected_snapshot(clicked_snapshot)
+		return
+
+	var selected_node_id := int(_selected_snapshot.get("node_id", -1))
+	var clicked_node_id := int(clicked_snapshot.get("node_id", -1))
+
+	if not clicked_snapshot.is_empty() and clicked_node_id >= 0 and clicked_node_id != selected_node_id:
+		_set_selected_snapshot(clicked_snapshot)
+		return
+
+	_move_selected_to_cursor()
+
+func _move_selected_to_cursor() -> void:
+	if _selected_snapshot.is_empty():
+		return
+
+	var target_container := _resolve_furniture_container()
+	if target_container == null:
+		push_error("FurniturePlacer: no valid furniture container.")
+		return
+
+	var old_snapshot: Dictionary = _selected_snapshot.duplicate(true)
+	var new_snapshot := _build_target_snapshot_from_cursor(old_snapshot)
+	if new_snapshot.is_empty() or _snapshot_pose_equal(old_snapshot, new_snapshot):
+		return
+
+	var did_apply := [false]
+	App.get_history_service().execute(
+		"move furniture",
+		func():
+			did_apply[0] = _replace_snapshot(old_snapshot, new_snapshot, target_container)
+			return did_apply[0],
+		func():
+			return _replace_snapshot(new_snapshot, old_snapshot, target_container)
+	)
+
+	if did_apply[0]:
+		_set_selected_snapshot(new_snapshot)
+
+func _rotate_selected_furniture() -> void:
+	if _selected_snapshot.is_empty():
+		return
+
+	var target_container := _resolve_furniture_container()
+	if target_container == null:
+		push_error("FurniturePlacer: no valid furniture container.")
+		return
+
+	var old_snapshot: Dictionary = _selected_snapshot.duplicate(true)
+	var new_snapshot: Dictionary = old_snapshot.duplicate(true)
+	var next_rotation := (_selected_rotation_index + 1) % 4
+	new_snapshot["rotation_index"] = next_rotation
+
+	var size: Vector2i = new_snapshot.get("size", Vector2i.ONE)
+	var use_grid := bool(new_snapshot.get("uses_grid_occupancy", true))
+	if use_grid:
+		var tile: Vector2i = new_snapshot.get("tile", Vector2i.ZERO)
+		new_snapshot["world_pos"] = App.get_furniture_service().get_snapped_world_position(tile, size, next_rotation)
+
+	var did_apply := [false]
+	App.get_history_service().execute(
+		"rotate furniture",
+		func():
+			did_apply[0] = _replace_snapshot(old_snapshot, new_snapshot, target_container)
+			return did_apply[0],
+		func():
+			return _replace_snapshot(new_snapshot, old_snapshot, target_container)
+	)
+
+	if did_apply[0]:
+		_set_selected_snapshot(new_snapshot)
+
+func _set_selected_snapshot(snapshot: Dictionary) -> void:
+	_selected_snapshot = snapshot.duplicate(true)
+	_selected_rotation_index = int(_selected_snapshot.get("rotation_index", 0))
+
+func _clear_selected_snapshot() -> void:
+	_selected_snapshot.clear()
+	_selected_rotation_index = 0
+
+func _build_target_snapshot_from_cursor(base_snapshot: Dictionary) -> Dictionary:
+	if base_snapshot.is_empty():
+		return {}
+
+	var next_snapshot: Dictionary = base_snapshot.duplicate(true)
+	var size: Vector2i = next_snapshot.get("size", Vector2i.ONE)
+	var use_grid := not Input.is_key_pressed(KEY_ALT)
+	var floor_index := int(next_snapshot.get("floor_index", App.get_floor_service().current_floor))
+	var target_world: Vector3
+	var target_tile: Vector2i
+
+	if use_grid:
+		target_tile = mouse_raycast.get_tile_under_mouse()
+		target_world = App.get_furniture_service().get_snapped_world_position(target_tile, size, _selected_rotation_index)
+	else:
+		target_world = mouse_raycast.get_world_position_under_mouse()
+		target_tile = App.get_grid_service().world_to_tile(target_world)
+
+	next_snapshot["tile"] = target_tile
+	next_snapshot["world_pos"] = target_world
+	next_snapshot["rotation_index"] = _selected_rotation_index
+	next_snapshot["uses_grid_occupancy"] = use_grid
+	next_snapshot["floor_index"] = floor_index
+	return next_snapshot
+
+func _snapshot_pose_equal(a: Dictionary, b: Dictionary) -> bool:
+	if bool(a.get("uses_grid_occupancy", true)) != bool(b.get("uses_grid_occupancy", true)):
+		return false
+	if int(a.get("rotation_index", 0)) != int(b.get("rotation_index", 0)):
+		return false
+	if int(a.get("floor_index", 0)) != int(b.get("floor_index", 0)):
+		return false
+	if (a.get("tile", Vector2i.ZERO) as Vector2i) != (b.get("tile", Vector2i.ZERO) as Vector2i):
+		return false
+	return (a.get("world_pos", Vector3.ZERO) as Vector3).is_equal_approx(b.get("world_pos", Vector3.ZERO))
+
+func _replace_snapshot(old_snapshot: Dictionary, new_snapshot: Dictionary, target_container: Node3D) -> bool:
+	if old_snapshot.is_empty() or new_snapshot.is_empty():
+		return false
+
+	if not App.get_furniture_service().remove_matching_snapshot(old_snapshot):
+		return false
+
+	var tile: Vector2i = new_snapshot.get("tile", Vector2i.ZERO)
+	var world_pos: Vector3 = new_snapshot.get("world_pos", Vector3.ZERO)
+	var rotation_index := int(new_snapshot.get("rotation_index", 0))
+	var scene_path := str(new_snapshot.get("scene_path", ""))
+	var size: Vector2i = new_snapshot.get("size", Vector2i.ONE)
+	var use_grid := bool(new_snapshot.get("uses_grid_occupancy", true))
+	var floor_index := int(new_snapshot.get("floor_index", App.get_floor_service().current_floor))
+
+	if scene_path == "":
+		App.get_furniture_service().restore_snapshot(old_snapshot, target_container)
+		return false
+
+	var placed: bool = bool(App.get_furniture_service().place_furniture_at(
+		tile,
+		world_pos,
+		rotation_index,
+		scene_path,
+		size,
+		target_container,
+		use_grid,
+		floor_index
+	))
+	if placed:
+		return true
+
+	App.get_furniture_service().restore_snapshot(old_snapshot, target_container)
+	return false
 
 # -------------------------------------------------------
 # Position logic
@@ -92,7 +296,7 @@ func _process(_delta: float) -> void:
 
 func _get_snapped_world_pos() -> Vector3:
 	var tile : Vector2i = mouse_raycast.get_tile_under_mouse()
-	return FurnitureSystem.get_snapped_world_position(tile, current_size, _rotation_index)
+	return App.get_furniture_service().get_snapped_world_position(tile, current_size, _rotation_index)
 
 func _get_free_world_pos() -> Vector3:
 	return mouse_raycast.get_world_position_under_mouse()
@@ -100,8 +304,7 @@ func _get_free_world_pos() -> Vector3:
 func _current_world_pos() -> Vector3:
 	if _free_mode:
 		return _get_free_world_pos()
-	else:
-		return _get_snapped_world_pos()
+	return _get_snapped_world_pos()
 
 # -------------------------------------------------------
 # Preview management
@@ -115,7 +318,7 @@ func _spawn_preview() -> void:
 	if scene == null:
 		return
 	_preview_instance = scene.instantiate()
-	# Disable any collision on the preview so it doesn't interfere
+	# Disable any collision on the preview so it does not interfere
 	for child in _preview_instance.get_children():
 		if child is CollisionObject3D:
 			child.collision_layer = 0
@@ -142,7 +345,7 @@ func _update_preview_position() -> void:
 		_preview_valid = _check_free_placement_valid(world_pos)
 	else:
 		var tile : Vector2i = mouse_raycast.get_tile_under_mouse()
-		_preview_valid = FurnitureSystem.can_place(tile, current_size, _rotation_index)
+		_preview_valid = App.get_furniture_service().can_place(tile, current_size, _rotation_index)
 
 	_apply_preview_tint(_preview_instance, _preview_valid)
 
@@ -163,20 +366,21 @@ func _place_snapped() -> void:
 		return
 
 	var tile : Vector2i = mouse_raycast.get_tile_under_mouse()
-	if not FurnitureSystem.can_place(tile, current_size, _rotation_index):
+	if not App.get_furniture_service().can_place(tile, current_size, _rotation_index):
 		return
 
-	var world_pos := FurnitureSystem.get_snapped_world_position(tile, current_size, _rotation_index)
+	var world_pos : Vector3 = App.get_furniture_service().get_snapped_world_position(tile, current_size, _rotation_index)
 	var rot := _rotation_index
 	var path := current_scene_path
 	var size := current_size
+	var floor_index : int = int(App.get_floor_service().current_floor)
 
-	UndoHistory.execute(
+	App.get_history_service().execute(
 		"place furniture",
 		func():
-			FurnitureSystem.place_furniture_at(tile, world_pos, rot, path, size, target_container),
+			return App.get_furniture_service().place_furniture_at(tile, world_pos, rot, path, size, target_container, true, floor_index),
 		func():
-			FurnitureSystem.remove_furniture_at_tile(tile)
+			return App.get_furniture_service().remove_furniture_at_tile(tile, floor_index)
 	)
 
 func _place_free() -> void:
@@ -190,16 +394,40 @@ func _place_free() -> void:
 		return
 
 	var path := current_scene_path
-	var rot  := _rotation_index
+	var rot := _rotation_index
+	var floor_index : int = int(App.get_floor_service().current_floor)
 	# In free mode we use the nearest tile just for storage/undo keying
-	var tile := GridManager.world_to_tile(world_pos)
+	var tile : Vector2i = App.get_grid_service().world_to_tile(world_pos)
 
-	UndoHistory.execute(
+	App.get_history_service().execute(
 		"place furniture (free)",
 		func():
-			FurnitureSystem.place_furniture_at(tile, world_pos, rot, path, current_size, target_container, false),
+			return App.get_furniture_service().place_furniture_at(tile, world_pos, rot, path, current_size, target_container, false, floor_index),
 		func():
-			FurnitureSystem.remove_furniture_at_world(world_pos)
+			return App.get_furniture_service().remove_furniture_at_world(world_pos, floor_index)
+	)
+
+func _delete_furniture_under_cursor() -> void:
+	var target_container := _resolve_furniture_container()
+	if target_container == null:
+		push_error("FurniturePlacer: no valid furniture container.")
+		return
+
+	var floor_index : int = int(App.get_floor_service().current_floor)
+	var world_pos: Vector3 = mouse_raycast.get_world_position_under_mouse()
+	var snapshot: Dictionary = App.get_furniture_service().get_snapshot_at_world(world_pos, floor_index)
+	if snapshot.is_empty():
+		return
+
+	if int(_selected_snapshot.get("node_id", -1)) == int(snapshot.get("node_id", -2)):
+		_clear_selected_snapshot()
+
+	App.get_history_service().execute(
+		"delete furniture",
+		func():
+			return App.get_furniture_service().remove_matching_snapshot(snapshot),
+		func():
+			return App.get_furniture_service().restore_snapshot(snapshot, target_container)
 	)
 
 # -------------------------------------------------------
@@ -213,7 +441,7 @@ func _check_free_placement_valid(world_pos: Vector3) -> bool:
 	if half_extents != Vector2.ZERO:
 		half_extents.x = maxf(0.01, half_extents.x - free_collision_padding)
 		half_extents.y = maxf(0.01, half_extents.y - free_collision_padding)
-	return FurnitureSystem.can_place_free_world(world_pos, current_size, _rotation_index)
+	return App.get_furniture_service().can_place_free_world(world_pos, current_size, _rotation_index)
 
 func _get_preview_half_extents_xz() -> Vector2:
 	if not is_instance_valid(_preview_instance):
@@ -274,9 +502,9 @@ func _setup_shape_cast() -> void:
 	var shape := BoxShape3D.new()
 	# Approximate size — adjust to match your furniture's average footprint
 	shape.size = Vector3(
-		current_size.x * GridManager.TILE_SIZE * 0.9,
+		current_size.x * App.get_grid_service().TILE_SIZE * 0.9,
 		1.8,
-		current_size.y * GridManager.TILE_SIZE * 0.9
+		current_size.y * App.get_grid_service().TILE_SIZE * 0.9
 	)
 	_shape_cast.shape = shape
 	_shape_cast.collision_mask = 2   # layer 2 = furniture (set this in project settings)

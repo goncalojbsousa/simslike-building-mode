@@ -73,6 +73,36 @@ layout_mode = 2
 custom_minimum_size = Vector2(68, 36)
 text = "Redo"
 
+[node name="SlotNameEdit" type="LineEdit" parent="FooterPanel/RootMargin/RootVBox/TopBar" unique_id=107021]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+placeholder_text = "slot"
+text = "quicksave"
+
+[node name="SlotPicker" type="OptionButton" parent="FooterPanel/RootMargin/RootVBox/TopBar" unique_id=107022]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 0)
+
+[node name="NewButton" type="Button" parent="FooterPanel/RootMargin/RootVBox/TopBar" unique_id=107018]
+layout_mode = 2
+custom_minimum_size = Vector2(68, 36)
+text = "New"
+
+[node name="SaveButton" type="Button" parent="FooterPanel/RootMargin/RootVBox/TopBar" unique_id=107019]
+layout_mode = 2
+custom_minimum_size = Vector2(68, 36)
+text = "Save"
+
+[node name="LoadButton" type="Button" parent="FooterPanel/RootMargin/RootVBox/TopBar" unique_id=107020]
+layout_mode = 2
+custom_minimum_size = Vector2(68, 36)
+text = "Load"
+
+[node name="StatusLabel" type="Label" parent="FooterPanel/RootMargin/RootVBox" unique_id=107023]
+layout_mode = 2
+modulate = Color(0.65, 0.9, 0.7, 1)
+text = ""
+
 [node name="CatalogPanel" type="PanelContainer" parent="FooterPanel/RootMargin/RootVBox" unique_id=107011]
 layout_mode = 2
 size_flags_vertical = 3

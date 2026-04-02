@@ -1,7 +1,8 @@
+class_name FurnitureService
 extends Node
 
 # --- Storage ---
-var _placed: Dictionary = {}   # Vector2i -> FurniturePlacement
+var _placed: Dictionary = {}   # "x,y,floor" -> FurniturePlacement
 var _free_placements: Array = []   # Array[FurniturePlacement]
 
 # --- Signals ---
@@ -10,6 +11,7 @@ signal furniture_removed(tile: Vector2i)
 
 class FurniturePlacement:
 	var tile: Vector2i
+	var floor_index: int = 0
 	var scene_path: String
 	var rotation_index: int = 0   # 0=0°, 1=90°, 2=180°, 3=270°
 	var node: Node3D = null
@@ -23,9 +25,11 @@ class FurniturePlacement:
 			rot: int,
 			sz: Vector2i,
 			grid_occupancy: bool = true,
-			collision_half: Vector2 = Vector2.ZERO
+			collision_half: Vector2 = Vector2.ZERO,
+			f: int = 0
 	) -> void:
 		tile = t
+		floor_index = f
 		scene_path = path
 		rotation_index = rot
 		size = sz
@@ -42,32 +46,47 @@ func _resolve_target_container(container: Node3D) -> Node3D:
 
 	return null
 
+func _grid_key(tile: Vector2i, floor_index: int) -> String:
+	return "%d,%d,%d" % [tile.x, tile.y, floor_index]
+
+func _world_y_to_floor_index(world_y: float) -> int:
+	if App.get_floor_service().FLOOR_HEIGHT <= 0.0:
+		return App.get_floor_service().current_floor
+	return clampi(roundi(world_y / App.get_floor_service().FLOOR_HEIGHT), 0, App.get_floor_service().MAX_FLOORS - 1)
+
+func _placement_floor_index(placement: FurniturePlacement) -> int:
+	if placement == null:
+		return App.get_floor_service().current_floor
+	return placement.floor_index
+
 # -------------------------------------------------------
 # Queries
 # -------------------------------------------------------
 
 func get_snapped_world_position(tile: Vector2i, size: Vector2i, rotation_index: int) -> Vector3:
+	var floor_index : int = App.get_floor_service().current_floor
 	var occupied := _get_occupied_tiles(tile, size, rotation_index)
 	if occupied.is_empty():
-		return GridManager.tile_to_world(tile)
+		return App.get_grid_service().tile_to_world_on_floor(tile, floor_index)
 
 	var sum := Vector3.ZERO
 	for t in occupied:
-		sum += GridManager.tile_to_world(t)
+		sum += App.get_grid_service().tile_to_world_on_floor(t, floor_index)
 	return sum / float(occupied.size())
 
 func can_place(tile: Vector2i, size: Vector2i, rotation_index: int) -> bool:
+	var floor_index : int = App.get_floor_service().current_floor
 	var tiles := _get_occupied_tiles(tile, size, rotation_index)
 	if tiles.is_empty():
 		return false
 
 	var world_pos := get_snapped_world_position(tile, size, rotation_index)
-	if _overlaps_existing_furniture(world_pos, size, rotation_index):
+	if _overlaps_existing_furniture(world_pos, size, rotation_index, Vector2.ZERO, floor_index):
 		return false
 
 	var occupied_lookup: Dictionary = {}
 	for t in tiles:
-		if GridManager.is_tile_occupied(t):
+		if App.get_grid_service().is_tile_occupied(t, floor_index):
 			return false
 		occupied_lookup[t] = true
 
@@ -81,7 +100,7 @@ func can_place(tile: Vector2i, size: Vector2i, rotation_index: int) -> bool:
 			Vector2i(t.x, t.y - 1),
 		]
 		for n in neighbors:
-			if occupied_lookup.has(n) and WallSystem.has_wall(t, n):
+			if occupied_lookup.has(n) and App.get_wall_service().has_wall(t, n, floor_index):
 				return false
 
 	return true
@@ -92,22 +111,26 @@ func can_place_free_world(
 		rotation_index: int,
 		candidate_half_extents: Vector2 = Vector2.ZERO
 ) -> bool:
-	if _overlaps_existing_furniture(world_pos, size, rotation_index, candidate_half_extents):
+	var floor_index := _world_y_to_floor_index(world_pos.y)
+	if _overlaps_existing_furniture(world_pos, size, rotation_index, candidate_half_extents, floor_index):
 		return false
 
-	if _overlaps_any_wall(world_pos, size, rotation_index, candidate_half_extents):
+	if _overlaps_any_wall(world_pos, size, rotation_index, candidate_half_extents, floor_index):
 		return false
 
 	return true
 
-func has_furniture_blocking_wall(from_tile: Vector2i, to_tile: Vector2i) -> bool:
-	var wall_a: Vector3 = GridManager.tile_to_world(from_tile)
-	var wall_b: Vector3 = GridManager.tile_to_world(to_tile)
+func has_furniture_blocking_wall(from_tile: Vector2i, to_tile: Vector2i, floor_index: int = -1) -> bool:
+	var f : int = floor_index if floor_index >= 0 else App.get_floor_service().current_floor
+	var wall_a: Vector3 = App.get_grid_service().tile_to_world(from_tile)
+	var wall_b: Vector3 = App.get_grid_service().tile_to_world(to_tile)
 	var wall_center := Vector2((wall_a.x + wall_b.x) * 0.5, (wall_a.z + wall_b.z) * 0.5)
 	var wall_half := _wall_half_extents_from_tiles(from_tile, to_tile)
 
 	for placement in _all_placements():
 		if not is_instance_valid(placement.node):
+			continue
+		if _placement_floor_index(placement) != f:
 			continue
 		var furniture_half := _placement_half_extents(placement)
 		var furniture_center := Vector2(placement.node.global_position.x, placement.node.global_position.z)
@@ -122,12 +145,46 @@ func _all_placements() -> Array:
 	result.append_array(_free_placements)
 	return result
 
+func get_all_snapshots() -> Array[Dictionary]:
+	var snapshots: Array[Dictionary] = []
+	for placement in _all_placements():
+		var snapshot := _make_snapshot(placement)
+		if snapshot.is_empty():
+			continue
+		snapshots.append(snapshot)
+	return snapshots
+
+func clear_all() -> void:
+	for placement_key_value in _placed.keys():
+		var placement_key := str(placement_key_value)
+		var placement: FurniturePlacement = _placed[placement_key]
+		if placement == null:
+			continue
+		if placement.uses_grid_occupancy:
+			var occupied := _get_occupied_tiles(placement.tile, placement.size, placement.rotation_index)
+			for t in occupied:
+				App.get_grid_service().set_tile_occupied(t, false, placement.floor_index)
+		if is_instance_valid(placement.node):
+			placement.node.queue_free()
+
+	for placement in _free_placements:
+		if placement == null:
+			continue
+		if is_instance_valid(placement.node):
+			placement.node.queue_free()
+
+	_placed.clear()
+	_free_placements.clear()
+
 func get_object_node_ids_in_tiles(tile_set: Dictionary) -> Array[int]:
 	var ids_lookup: Dictionary = {}
+	var floor_index : int = App.get_floor_service().current_floor
 	for placement in _all_placements():
 		if placement == null or not is_instance_valid(placement.node):
 			continue
-		var world_tile := GridManager.world_to_tile(placement.node.global_position)
+		if _placement_floor_index(placement) != floor_index:
+			continue
+		var world_tile : Vector2i = App.get_grid_service().world_to_tile(placement.node.global_position)
 		if not tile_set.has(world_tile):
 			continue
 		ids_lookup[placement.node.get_instance_id()] = true
@@ -137,25 +194,26 @@ func get_object_node_ids_in_tiles(tile_set: Dictionary) -> Array[int]:
 		ids.append(int(id_value))
 	return ids
 
-func _translate_grid_placement(tile_key: Vector2i, placement: FurniturePlacement, delta_tiles: Vector2i) -> bool:
+func _translate_grid_placement(tile_key: String, placement: FurniturePlacement, delta_tiles: Vector2i) -> bool:
 	if placement == null or not is_instance_valid(placement.node):
 		return false
+	var floor_index := placement.floor_index
 
 	if placement.uses_grid_occupancy:
 		var old_occupied := _get_occupied_tiles(placement.tile, placement.size, placement.rotation_index)
 		for t in old_occupied:
-			GridManager.set_tile_occupied(t, false)
+			App.get_grid_service().set_tile_occupied(t, false, floor_index)
 
 	placement.tile += delta_tiles
-	placement.node.global_position += Vector3(delta_tiles.x * GridManager.TILE_SIZE, 0.0, delta_tiles.y * GridManager.TILE_SIZE)
+	placement.node.global_position += Vector3(delta_tiles.x * App.get_grid_service().TILE_SIZE, 0.0, delta_tiles.y * App.get_grid_service().TILE_SIZE)
 
 	if placement.uses_grid_occupancy:
 		var new_occupied := _get_occupied_tiles(placement.tile, placement.size, placement.rotation_index)
 		for t in new_occupied:
-			GridManager.set_tile_occupied(t, true)
+			App.get_grid_service().set_tile_occupied(t, true, floor_index)
 
 	_placed.erase(tile_key)
-	_placed[placement.tile] = placement
+	_placed[_grid_key(placement.tile, floor_index)] = placement
 	return true
 
 func _translate_free_placement(index: int, placement: FurniturePlacement, delta_tiles: Vector2i) -> bool:
@@ -165,19 +223,19 @@ func _translate_free_placement(index: int, placement: FurniturePlacement, delta_
 		return false
 
 	placement.tile += delta_tiles
-	placement.node.global_position += Vector3(delta_tiles.x * GridManager.TILE_SIZE, 0.0, delta_tiles.y * GridManager.TILE_SIZE)
+	placement.node.global_position += Vector3(delta_tiles.x * App.get_grid_service().TILE_SIZE, 0.0, delta_tiles.y * App.get_grid_service().TILE_SIZE)
 	_free_placements[index] = placement
 	return true
 
 func _translate_object_by_node_id(node_id: int, delta_tiles: Vector2i) -> bool:
-	for tile_value in _placed.keys():
-		var tile: Vector2i = tile_value
-		var placement: FurniturePlacement = _placed[tile]
+	for placement_key_value in _placed.keys():
+		var placement_key := str(placement_key_value)
+		var placement: FurniturePlacement = _placed[placement_key]
 		if placement == null or not is_instance_valid(placement.node):
 			continue
 		if placement.node.get_instance_id() != node_id:
 			continue
-		return _translate_grid_placement(tile, placement, delta_tiles)
+		return _translate_grid_placement(placement_key, placement, delta_tiles)
 
 	for i in range(_free_placements.size()):
 		var free_placement: FurniturePlacement = _free_placements[i]
@@ -199,13 +257,17 @@ func _overlaps_existing_furniture(
 		world_pos: Vector3,
 		size: Vector2i,
 		rotation_index: int,
-		candidate_half_extents: Vector2 = Vector2.ZERO
+		candidate_half_extents: Vector2 = Vector2.ZERO,
+		floor_index: int = -1
 ) -> bool:
+	var f := floor_index if floor_index >= 0 else _world_y_to_floor_index(world_pos.y)
 	var half := candidate_half_extents if candidate_half_extents != Vector2.ZERO else _get_world_half_extents(size, rotation_index)
 	var center := Vector2(world_pos.x, world_pos.z)
 
 	for placement in _all_placements():
 		if not is_instance_valid(placement.node):
+			continue
+		if _placement_floor_index(placement) != f:
 			continue
 		var other_half := _placement_half_extents(placement)
 		var other_center := Vector2(placement.node.global_position.x, placement.node.global_position.z)
@@ -218,14 +280,19 @@ func _overlaps_any_wall(
 		world_pos: Vector3,
 		size: Vector2i,
 		rotation_index: int,
-		candidate_half_extents: Vector2 = Vector2.ZERO
+		candidate_half_extents: Vector2 = Vector2.ZERO,
+		floor_index: int = -1
 ) -> bool:
+	var f := floor_index if floor_index >= 0 else _world_y_to_floor_index(world_pos.y)
 	var half := candidate_half_extents if candidate_half_extents != Vector2.ZERO else _get_world_half_extents(size, rotation_index)
 	var center := Vector2(world_pos.x, world_pos.z)
 
-	for wall_data in WallSystem.get_all_walls():
-		var wall_a: Vector3 = GridManager.tile_to_world(wall_data.from_tile)
-		var wall_b: Vector3 = GridManager.tile_to_world(wall_data.to_tile)
+	for key in App.get_wall_service().get_wall_keys_for_floor(f):
+		var wall_data = App.get_wall_service().get_wall_by_key(key)
+		if wall_data == null:
+			continue
+		var wall_a: Vector3 = App.get_grid_service().tile_to_world(wall_data.from_tile)
+		var wall_b: Vector3 = App.get_grid_service().tile_to_world(wall_data.to_tile)
 		var wall_center := Vector2((wall_a.x + wall_b.x) * 0.5, (wall_a.z + wall_b.z) * 0.5)
 		var wall_half := _wall_half_extents_from_tiles(wall_data.from_tile, wall_data.to_tile)
 		if _rects_overlap(center, half, wall_center, wall_half):
@@ -293,9 +360,9 @@ func _wall_half_extents_from_tiles(from_tile: Vector2i, to_tile: Vector2i) -> Ve
 	var wall_diff: Vector2i = to_tile - from_tile
 	if wall_diff.x != 0:
 		# Shared vertical edge (parallel to Z)
-		return Vector2(0.08, GridManager.TILE_SIZE * 0.5)
+		return Vector2(0.08, App.get_grid_service().TILE_SIZE * 0.5)
 	# Shared horizontal edge (parallel to X)
-	return Vector2(GridManager.TILE_SIZE * 0.5, 0.08)
+	return Vector2(App.get_grid_service().TILE_SIZE * 0.5, 0.08)
 
 func _make_snapshot(placement: FurniturePlacement) -> Dictionary:
 	if placement == null or not is_instance_valid(placement.node):
@@ -303,6 +370,7 @@ func _make_snapshot(placement: FurniturePlacement) -> Dictionary:
 	return {
 		"node_id": placement.node.get_instance_id(),
 		"tile": placement.tile,
+		"floor_index": placement.floor_index,
 		"scene_path": placement.scene_path,
 		"rotation_index": placement.rotation_index,
 		"size": placement.size,
@@ -310,15 +378,53 @@ func _make_snapshot(placement: FurniturePlacement) -> Dictionary:
 		"world_pos": placement.node.global_position,
 	}
 
-func get_snapshots_blocking_wall(from_tile: Vector2i, to_tile: Vector2i) -> Array[Dictionary]:
+func get_snapshot_at_world(world_pos: Vector3, floor_index: int = -1) -> Dictionary:
+	var f := floor_index if floor_index >= 0 else _world_y_to_floor_index(world_pos.y)
+	var best_snapshot: Dictionary = {}
+	var best_distance := INF
+
+	for placement in _all_placements():
+		if placement == null or not is_instance_valid(placement.node):
+			continue
+		if _placement_floor_index(placement) != f:
+			continue
+		var distance: float = placement.node.global_position.distance_to(world_pos)
+		if distance >= App.get_grid_service().TILE_SIZE or distance >= best_distance:
+			continue
+		var snapshot := _make_snapshot(placement)
+		if snapshot.is_empty():
+			continue
+		best_distance = distance
+		best_snapshot = snapshot
+
+	return best_snapshot
+
+func remove_matching_snapshot(snapshot: Dictionary) -> bool:
+	if snapshot.is_empty():
+		return false
+
+	var floor_index := int(snapshot.get("floor_index", App.get_floor_service().current_floor))
+	if bool(snapshot.get("uses_grid_occupancy", true)):
+		if not snapshot.has("tile"):
+			return false
+		var tile: Vector2i = snapshot.get("tile", Vector2i.ZERO)
+		return remove_furniture_at_tile(tile, floor_index)
+
+	var world_pos: Vector3 = snapshot.get("world_pos", Vector3.ZERO)
+	return remove_furniture_at_world(world_pos, floor_index)
+
+func get_snapshots_blocking_wall(from_tile: Vector2i, to_tile: Vector2i, floor_index: int = -1) -> Array[Dictionary]:
+	var f : float = floor_index if floor_index >= 0 else App.get_floor_service().current_floor
 	var snapshots: Array[Dictionary] = []
-	var wall_a: Vector3 = GridManager.tile_to_world(from_tile)
-	var wall_b: Vector3 = GridManager.tile_to_world(to_tile)
+	var wall_a: Vector3 = App.get_grid_service().tile_to_world(from_tile)
+	var wall_b: Vector3 = App.get_grid_service().tile_to_world(to_tile)
 	var wall_center := Vector2((wall_a.x + wall_b.x) * 0.5, (wall_a.z + wall_b.z) * 0.5)
 	var wall_half := _wall_half_extents_from_tiles(from_tile, to_tile)
 
 	for placement in _all_placements():
 		if placement == null or not is_instance_valid(placement.node):
+			continue
+		if _placement_floor_index(placement) != f:
 			continue
 		var furniture_half := _placement_half_extents(placement)
 		var furniture_center := Vector2(placement.node.global_position.x, placement.node.global_position.z)
@@ -331,13 +437,13 @@ func get_snapshots_blocking_wall(from_tile: Vector2i, to_tile: Vector2i) -> Arra
 	return snapshots
 
 func _remove_by_node_id(node_id: int) -> bool:
-	for tile_value in _placed.keys():
-		var tile: Vector2i = tile_value
-		var placement: FurniturePlacement = _placed[tile]
+	for placement_key_value in _placed.keys():
+		var placement_key := str(placement_key_value)
+		var placement: FurniturePlacement = _placed[placement_key]
 		if placement == null or not is_instance_valid(placement.node):
 			continue
 		if placement.node.get_instance_id() == node_id:
-			return remove_furniture_at_tile(tile)
+			return remove_furniture_at_tile(placement.tile, placement.floor_index)
 
 	for i in range(_free_placements.size()):
 		var placement: FurniturePlacement = _free_placements[i]
@@ -374,11 +480,12 @@ func restore_snapshot(snapshot: Dictionary, container: Node3D = null) -> bool:
 	var scene_path := str(snapshot.get("scene_path", ""))
 	var size: Vector2i = snapshot.get("size", Vector2i.ONE)
 	var uses_grid := bool(snapshot.get("uses_grid_occupancy", true))
+	var floor_index := int(snapshot.get("floor_index", _world_y_to_floor_index(world_pos.y)))
 
 	if scene_path == "":
 		return false
 
-	return place_furniture_at(tile, world_pos, rotation_index, scene_path, size, container, uses_grid)
+	return place_furniture_at(tile, world_pos, rotation_index, scene_path, size, container, uses_grid, floor_index)
 
 func _get_occupied_tiles(origin: Vector2i, size: Vector2i, rotation_index: int) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
@@ -408,8 +515,8 @@ func _get_world_half_extents(size: Vector2i, rotation_index: int) -> Vector2:
 		safe_size = Vector2i.ONE
 	var dims := _get_rotated_size(safe_size, rotation_index)
 	return Vector2(
-		dims.x * GridManager.TILE_SIZE * 0.5 * 0.95,
-		dims.y * GridManager.TILE_SIZE * 0.5 * 0.95
+		dims.x * App.get_grid_service().TILE_SIZE * 0.5 * 0.95,
+		dims.y * App.get_grid_service().TILE_SIZE * 0.5 * 0.95
 	)
 
 func _rects_overlap(a_center: Vector2, a_half: Vector2, b_center: Vector2, b_half: Vector2) -> bool:
@@ -429,9 +536,10 @@ func place_furniture(
 		rotation_index: int,
 		container: Node3D
 ) -> bool:
+	var floor_index : int = App.get_floor_service().current_floor
 	var target_container := _resolve_target_container(container)
 	if target_container == null:
-		push_error("FurnitureSystem: no valid container to place furniture.")
+		push_error("App.get_furniture_service(): no valid container to place furniture.")
 		return false
 
 	if not can_place(tile, size, rotation_index):
@@ -439,7 +547,7 @@ func place_furniture(
 
 	var scene: PackedScene = load(scene_path)
 	if scene == null:
-		push_error("FurnitureSystem: scene not found at " + scene_path)
+		push_error("App.get_furniture_service(): scene not found at " + scene_path)
 		return false
 
 	var instance: Node3D = scene.instantiate()
@@ -455,27 +563,29 @@ func place_furniture(
 	# Mark tiles occupied
 	var occupied := _get_occupied_tiles(tile, size, rotation_index)
 	for t in occupied:
-		GridManager.set_tile_occupied(t, true)
+		App.get_grid_service().set_tile_occupied(t, true, floor_index)
 
-	var placement := FurniturePlacement.new(tile, scene_path, rotation_index, size, true, collision_half)
+	var placement := FurniturePlacement.new(tile, scene_path, rotation_index, size, true, collision_half, floor_index)
 	placement.node = instance
-	_placed[tile] = placement
+	_placed[_grid_key(tile, floor_index)] = placement
 
 	furniture_placed.emit(tile)
 	return true
 
-func remove_furniture(tile: Vector2i) -> bool:
-	if not _placed.has(tile):
+func remove_furniture(tile: Vector2i, floor_index: int = -1) -> bool:
+	var f: int = floor_index if floor_index >= 0 else int(App.get_floor_service().current_floor)
+	var placement_key := _grid_key(tile, f)
+	if not _placed.has(placement_key):
 		return false
 
-	var placement: FurniturePlacement = _placed[tile]
+	var placement: FurniturePlacement = _placed[placement_key]
 	if placement.uses_grid_occupancy:
 		var occupied := _get_occupied_tiles(placement.tile, placement.size, placement.rotation_index)
 		for t in occupied:
-			GridManager.set_tile_occupied(t, false)
+			App.get_grid_service().set_tile_occupied(t, false, f)
 
 	placement.node.queue_free()
-	_placed.erase(tile)
+	_placed.erase(placement_key)
 	furniture_removed.emit(tile)
 	return true
 
@@ -488,16 +598,18 @@ func place_furniture_at(
 		scene_path: String,
 		size: Vector2i,
 		container: Node3D,
-		use_grid_occupancy: bool = true
+		use_grid_occupancy: bool = true,
+		floor_index: int = -1
 ) -> bool:
+	var f := floor_index if floor_index >= 0 else _world_y_to_floor_index(world_pos.y)
 	var target_container := _resolve_target_container(container)
 	if target_container == null:
-		push_error("FurnitureSystem: no valid container to place furniture.")
+		push_error("App.get_furniture_service(): no valid container to place furniture.")
 		return false
 
 	var scene: PackedScene = load(scene_path)
 	if scene == null:
-		push_error("FurnitureSystem: scene not found: " + scene_path)
+		push_error("App.get_furniture_service(): scene not found: " + scene_path)
 		return false
 
 	var instance: Node3D = scene.instantiate()
@@ -512,31 +624,34 @@ func place_furniture_at(
 	if use_grid_occupancy and size != Vector2i.ZERO:
 		var occupied := _get_occupied_tiles(tile, size, rotation_index)
 		for t in occupied:
-			GridManager.set_tile_occupied(t, true)
+			App.get_grid_service().set_tile_occupied(t, true, f)
 
-	var placement := FurniturePlacement.new(tile, scene_path, rotation_index, size, use_grid_occupancy, collision_half)
+	var placement := FurniturePlacement.new(tile, scene_path, rotation_index, size, use_grid_occupancy, collision_half, f)
 	placement.node = instance
 	if use_grid_occupancy:
-		_placed[tile] = placement
+		_placed[_grid_key(tile, f)] = placement
 	else:
 		_free_placements.append(placement)
 	furniture_placed.emit(tile)
 	return true
 
 # Removes by tile key (snapped mode)
-func remove_furniture_at_tile(tile: Vector2i) -> bool:
-	return remove_furniture(tile)   # your existing method
+func remove_furniture_at_tile(tile: Vector2i, floor_index: int = -1) -> bool:
+	return remove_furniture(tile, floor_index)
 
 # Removes by approximate world position (free mode)
-func remove_furniture_at_world(world_pos: Vector3) -> bool:
+func remove_furniture_at_world(world_pos: Vector3, floor_index: int = -1) -> bool:
+	var f := floor_index if floor_index >= 0 else _world_y_to_floor_index(world_pos.y)
 	var best_index := -1
 	var best_distance := INF
 	for i in range(_free_placements.size()):
 		var free_placement: FurniturePlacement = _free_placements[i]
 		if not is_instance_valid(free_placement.node):
 			continue
+		if _placement_floor_index(free_placement) != f:
+			continue
 		var d := free_placement.node.global_position.distance_to(world_pos)
-		if d < GridManager.TILE_SIZE and d < best_distance:
+		if d < App.get_grid_service().TILE_SIZE and d < best_distance:
 			best_distance = d
 			best_index = i
 
@@ -548,13 +663,14 @@ func remove_furniture_at_world(world_pos: Vector3) -> bool:
 		furniture_removed.emit(removed.tile)
 		return true
 
-	var closest_tile := GridManager.world_to_tile(world_pos)
+	var closest_tile : Vector2i = App.get_grid_service().world_to_tile(world_pos)
 	# Search a small radius around the tile in case of float rounding
 	for dx in range(-1, 2):
 		for dy in range(-1, 2):
 			var t := closest_tile + Vector2i(dx, dy)
-			if _placed.has(t):
-				var p: FurniturePlacement = _placed[t]
-				if p.node.global_position.distance_to(world_pos) < GridManager.TILE_SIZE:
-					return remove_furniture(t)
+			var key := _grid_key(t, f)
+			if _placed.has(key):
+				var p: FurniturePlacement = _placed[key]
+				if p.node.global_position.distance_to(world_pos) < App.get_grid_service().TILE_SIZE:
+					return remove_furniture(t, f)
 	return false

@@ -10,9 +10,11 @@ const NEIGHBORS := [
 
 # Maximum tiles a flood fill will visit before declaring "open space"
 # Set this larger than your biggest possible room
-const MAX_FILL_TILES := 10000
+const MAX_FILL_TILES := 50000
 
 func _make_wall_key(a: Vector2i, b: Vector2i, floor_index: int) -> String:
+	if App.get_wall_service() != null and App.get_wall_service().has_method("make_key"):
+		return str(App.get_wall_service().call("make_key", a, b, floor_index))
 	if a.x < b.x or (a.x == b.x and a.y < b.y):
 		if floor_index == 0:
 			return "%d,%d|%d,%d" % [a.x, a.y, b.x, b.y]
@@ -22,12 +24,12 @@ func _make_wall_key(a: Vector2i, b: Vector2i, floor_index: int) -> String:
 	return "%d,%d,%d|%d,%d,%d" % [b.x, b.y, floor_index, a.x, a.y, floor_index]
 
 func _has_wall_on_floor(a: Vector2i, b: Vector2i, floor_index: int) -> bool:
-	return WallSystem.get_wall_by_key(_make_wall_key(a, b, floor_index)) != null
+	return App.get_wall_service().get_wall_by_key(_make_wall_key(a, b, floor_index)) != null
 
 func _wall_candidates_for_floor(floor_index: int) -> Dictionary:
 	var candidates: Dictionary = {}
-	for key in WallSystem.get_wall_keys_for_floor(floor_index):
-		var wall_data = WallSystem.get_wall_by_key(key)
+	for key in App.get_wall_service().get_wall_keys_for_floor(floor_index):
+		var wall_data = App.get_wall_service().get_wall_by_key(key)
 		if wall_data == null:
 			continue
 		candidates[wall_data.from_tile] = true
@@ -76,11 +78,13 @@ func _is_outside_bounds(tile: Vector2i, bounds: Dictionary) -> bool:
 func _flood_from_tile_on_floor(start_tile: Vector2i, floor_index: int, bounds: Dictionary) -> Dictionary:
 	var visited: Dictionary = {}
 	var queue: Array[Vector2i] = [start_tile]
+	var queue_index := 0
 	visited[start_tile] = true
 	var enclosed := true
 
-	while queue.size() > 0:
-		var current: Vector2i = queue.pop_front()
+	while queue_index < queue.size():
+		var current: Vector2i = queue[queue_index]
+		queue_index += 1
 
 		if visited.size() > MAX_FILL_TILES:
 			enclosed = false
@@ -113,7 +117,7 @@ func _flood_from_tile_on_floor(start_tile: Vector2i, floor_index: int, bounds: D
 # -------------------------------------------------------
 
 func detect_room_from_tile(start_tile: Vector2i) -> Array[Vector2i]:
-	var floor_index := FloorManager.current_floor
+	var floor_index : int = App.get_floor_service().current_floor
 	var candidates := _wall_candidates_for_floor(floor_index)
 	if candidates.is_empty():
 		return []
@@ -137,8 +141,8 @@ func detect_room_from_tile(start_tile: Vector2i) -> Array[Vector2i]:
 func detect_all_rooms() -> Array:
 	var rooms: Array = []
 	var floors: Dictionary = {}
-	for key in WallSystem.get_all_wall_keys():
-		floors[WallSystem.get_floor_from_key(key)] = true
+	for key in App.get_wall_service().get_all_wall_keys():
+		floors[App.get_wall_service().get_floor_from_key(key)] = true
 
 	for floor_value in floors.keys():
 		rooms.append_array(detect_all_rooms_on_floor(int(floor_value)))

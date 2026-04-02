@@ -18,16 +18,16 @@ extends Node
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-const NEIGHBORS := [
+const NEIGHBORS = [
 	Vector2i(1, 0),
 	Vector2i(-1, 0),
 	Vector2i(0, 1),
 	Vector2i(0, -1),
 ]
 
-const DRAG_NONE   := 0
-const DRAG_MOVE   := 1
-const DRAG_RESIZE := 2
+const DRAG_NONE   = 0
+const DRAG_MOVE   = 1
+const DRAG_RESIZE = 2
 
 # ---------------------------------------------------------------------------
 # DragState — owns every field that is only meaningful during an active drag.
@@ -103,9 +103,6 @@ var _preview_valid: bool = true
 var _handles: Array[Dictionary]    = []
 var _handle_nodes: Dictionary      = {}
 
-var _other_room_tiles: Dictionary  = {}
-var _other_boundary_keys: Dictionary = {}
-
 var _highlight_node: MeshInstance3D          = null
 var _highlight_material: StandardMaterial3D  = null
 var _preview_valid_material: StandardMaterial3D   = null
@@ -117,9 +114,9 @@ var _handle_material: StandardMaterial3D     = null
 # ---------------------------------------------------------------------------
 func _ready() -> void:
 	_setup_materials()
-	WallSystem.wall_placed.connect(_on_world_changed)
-	WallSystem.wall_removed.connect(_on_world_changed)
-	FloorManager.floor_changed.connect(_on_floor_changed)
+	App.get_wall_service().wall_placed.connect(_on_world_changed)
+	App.get_wall_service().wall_removed.connect(_on_world_changed)
+	App.get_floor_service().floor_changed.connect(_on_floor_changed)
 
 func activate() -> void:
 	active = true
@@ -138,13 +135,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event is InputEventKey:
-		var ke := event as InputEventKey
+		var ke = event as InputEventKey
 		if ke.pressed and ke.keycode == KEY_ESCAPE:
 			_cancel_drag()
 			return
 
 	if event is InputEventMouseButton:
-		var mb := event as InputEventMouseButton
+		var mb = event as InputEventMouseButton
 
 		if mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
 			_cancel_drag()
@@ -179,7 +176,7 @@ func _on_left_pressed() -> void:
 		return
 
 	# Check if the cursor is close enough to a resize handle.
-	var picked_handle := _pick_handle_under_mouse()
+	var picked_handle = _pick_handle_under_mouse()
 	if not picked_handle.is_empty():
 		_begin_resize_drag(picked_handle)
 		return
@@ -227,7 +224,7 @@ func _commit_move_drag() -> void:
 	# selected, narrow the selection to only the room that was clicked.
 	if _drag.move_delta == Vector2i.ZERO:
 		if _sel.room_count() > 1 and _sel.has_tile(_drag.start_tile):
-			var clicked_room := _find_room_containing_tile(_drag.start_tile)
+			var clicked_room = _find_room_containing_tile(_drag.start_tile)
 			if not clicked_room.is_empty():
 				_set_selected_room_from_array(clicked_room)
 		_cancel_drag()
@@ -237,7 +234,7 @@ func _commit_move_drag() -> void:
 		_cancel_drag()
 		return
 
-	var target_tiles := _preview_tiles.duplicate(true)
+	var target_tiles = _preview_tiles.duplicate(true)
 	if _apply_tile_transform(_drag.base_tiles, target_tiles, "move room", false, _drag.move_delta):
 		_offset_selected_rooms(_drag.move_delta)
 
@@ -261,8 +258,8 @@ func _begin_resize_drag(handle: Dictionary) -> void:
 func _update_resize_drag_preview() -> void:
 	var current_world: Vector3 = mouse_raycast.get_world_position_under_mouse()
 	var dir_world: Vector3 = _dir_to_world(_drag.handle["dir"])
-	var projected := (current_world - _drag.start_world).dot(dir_world)
-	var steps := roundi(projected / GridManager.TILE_SIZE)
+	var projected = (current_world - _drag.start_world).dot(dir_world)
+	var steps = roundi(projected / App.get_grid_service().TILE_SIZE)
 
 	if steps == _drag.resize_steps:
 		return
@@ -276,7 +273,7 @@ func _update_resize_drag_preview() -> void:
 		_update_selection_visuals()
 		return
 
-	var resized_tiles := _resize_tiles_from_handle(_drag.base_tiles, _drag.handle, steps)
+	var resized_tiles = _resize_tiles_from_handle(_drag.base_tiles, _drag.handle, steps)
 	if resized_tiles.is_empty():
 		# Resize would collapse the room — keep showing base tiles in red.
 		_preview_tiles = _drag.base_tiles.duplicate(true)
@@ -293,7 +290,7 @@ func _commit_resize_drag() -> void:
 		_cancel_drag()
 		return
 
-	var target_tiles := _preview_tiles.duplicate(true)
+	var target_tiles = _preview_tiles.duplicate(true)
 	if _apply_tile_transform(_drag.base_tiles, target_tiles, "resize room", true):
 		_set_selected_room_from_set(target_tiles)
 
@@ -317,19 +314,19 @@ func _cancel_drag(reset_visuals: bool = true) -> void:
 # Selection helpers
 # ---------------------------------------------------------------------------
 func _select_room_at_tile(tile: Vector2i) -> void:
-	var room_tiles := _find_room_containing_tile(tile)
+	var room_tiles = _find_room_containing_tile(tile)
 	if room_tiles.is_empty():
 		_clear_selection()
 		return
 	_set_selected_room_from_array(room_tiles)
 
 func _toggle_room_selection_at_tile(tile: Vector2i) -> void:
-	var room_tiles := _find_room_containing_tile(tile)
+	var room_tiles = _find_room_containing_tile(tile)
 	if room_tiles.is_empty():
 		return
 
-	var room_set  := _array_to_set(room_tiles)
-	var signature := _tiles_signature(room_set)
+	var room_set  = _array_to_set(room_tiles)
+	var signature = _tiles_signature(room_set)
 
 	if _sel.rooms.has(signature):
 		_sel.rooms.erase(signature)
@@ -341,11 +338,11 @@ func _toggle_room_selection_at_tile(tile: Vector2i) -> void:
 	_rebuild_selected_union_from_rooms()
 
 func _find_room_containing_tile(tile: Vector2i) -> Array:
-	var detector: Node = WallSystem.get_room_detector()
+	var detector: Node = App.get_wall_service().get_room_detector()
 	if detector == null:
 		return []
 
-	var rooms: Array = detector.detect_all_rooms_on_floor(FloorManager.current_floor)
+	var rooms: Array = detector.detect_all_rooms_on_floor(App.get_floor_service().current_floor)
 	for room_value in rooms:
 		if not (room_value is Array):
 			continue
@@ -368,8 +365,8 @@ func _set_selected_room_from_set(tile_set: Dictionary) -> void:
 		_update_selection_visuals()
 		return
 
-	var room_set  := tile_set.duplicate(true)
-	var signature := _tiles_signature(room_set)
+	var room_set  = tile_set.duplicate(true)
+	var signature = _tiles_signature(room_set)
 	_sel.rooms[signature]        = room_set
 	_sel.room_anchors[signature] = _first_tile(room_set)
 	_rebuild_selected_union_from_rooms()
@@ -397,10 +394,10 @@ func _offset_selected_rooms(delta: Vector2i) -> void:
 	var moved_anchors: Dictionary = {}
 
 	for room_set in _sel.rooms.values():
-		var moved_set := _offset_tiles(room_set as Dictionary, delta)
+		var moved_set = _offset_tiles(room_set as Dictionary, delta)
 		if moved_set.is_empty():
 			continue
-		var moved_sig := _tiles_signature(moved_set)
+		var moved_sig = _tiles_signature(moved_set)
 		moved_rooms[moved_sig]   = moved_set
 		moved_anchors[moved_sig] = _first_tile(moved_set)
 
@@ -421,6 +418,54 @@ func _has_selected_room() -> bool:
 func _has_single_selected_room() -> bool:
 	return _sel.room_count() == 1
 
+func delete_selected_rooms() -> bool:
+	if not active or _drag.is_active() or _sel.tiles.is_empty():
+		return false
+
+	var floor_index = App.get_floor_service().current_floor
+	var selected_tiles_snapshot: Dictionary = _sel.tiles.duplicate(true)
+	var boundary_map := _boundary_wall_map(selected_tiles_snapshot, floor_index)
+	if boundary_map.is_empty():
+		return false
+
+	var removable_edges: Array[Dictionary] = []
+	for edge_value in boundary_map.values():
+		if not (edge_value is Dictionary):
+			continue
+		var edge := edge_value as Dictionary
+		var from_tile: Vector2i = edge.get("from", Vector2i.ZERO)
+		var to_tile: Vector2i = edge.get("to", Vector2i.ZERO)
+		if not App.get_wall_service().has_wall(from_tile, to_tile, floor_index):
+			continue
+		removable_edges.append({
+			"from": from_tile,
+			"to": to_tile,
+		})
+
+	if removable_edges.is_empty():
+		return false
+
+	var opening_snapshots := _snapshot_room_openings(selected_tiles_snapshot)
+
+	App.get_history_service().execute(
+		"delete room",
+		func():
+			App.get_wall_service().begin_batch()
+			for edge in removable_edges:
+				App.get_wall_service().remove_wall(edge["from"], edge["to"], floor_index)
+			App.get_wall_service().end_batch()
+			_clear_selection(),
+		func():
+			App.get_wall_service().begin_batch()
+			for edge in removable_edges:
+				App.get_wall_service().place_wall(edge["from"], edge["to"], floor_index)
+			App.get_wall_service().end_batch()
+			_restore_openings_from_snapshots(opening_snapshots, selected_tiles_snapshot)
+			_refresh_selection_after_world_change()
+	)
+
+	return true
+
 # ---------------------------------------------------------------------------
 # World-change callbacks
 # ---------------------------------------------------------------------------
@@ -436,7 +481,7 @@ func _refresh_selection_after_world_change() -> void:
 		var anchor: Vector2i = _sel.room_anchors.get(signature, _first_tile(previous_tiles))
 
 		# Try the stored anchor first, then fall back to any tile in the room.
-		var room := _find_room_containing_tile(anchor)
+		var room = _find_room_containing_tile(anchor)
 		if room.is_empty():
 			for t in previous_tiles.keys():
 				room = _find_room_containing_tile(t)
@@ -446,8 +491,8 @@ func _refresh_selection_after_world_change() -> void:
 		if room.is_empty():
 			continue
 
-		var room_set  := _array_to_set(room)
-		var new_sig   := _tiles_signature(room_set)
+		var room_set  = _array_to_set(room)
+		var new_sig   = _tiles_signature(room_set)
 		refreshed_rooms[new_sig]   = room_set
 		refreshed_anchors[new_sig] = _first_tile(room_set)
 
@@ -497,15 +542,15 @@ func _rebuild_highlight(tile_set: Dictionary, valid: bool) -> void:
 
 	_ensure_highlight_node()
 
-	var st := SurfaceTool.new()
+	var st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var y  := FloorManager.get_floor_y_offset(FloorManager.current_floor) + 0.04
-	var ts := GridManager.TILE_SIZE
+	var y  = App.get_floor_service().get_floor_y_offset(App.get_floor_service().current_floor) + 0.04
+	var ts = App.get_grid_service().TILE_SIZE
 
 	for tile_value in tile_set.keys():
 		var t: Vector2i = tile_value
-		var x0 := t.x * ts;  var x1 := x0 + ts
-		var z0 := t.y * ts;  var z1 := z0 + ts
+		var x0 = t.x * ts;  var x1 = x0 + ts
+		var z0 = t.y * ts;  var z1 = z0 + ts
 
 		st.set_normal(Vector3.UP)
 		st.add_vertex(Vector3(x0, y, z0))
@@ -530,8 +575,11 @@ func _ensure_highlight_node() -> void:
 		return
 	_highlight_node = MeshInstance3D.new()
 	_highlight_node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var host := get_parent() as Node3D
-	(host if host != null else self).add_child(_highlight_node)
+	var host = get_parent() as Node3D
+	if host != null:
+		host.add_child(_highlight_node)
+	else:
+		add_child(_highlight_node)
 
 func _clear_highlight() -> void:
 	if is_instance_valid(_highlight_node):
@@ -565,13 +613,13 @@ func _clear_handle_nodes() -> void:
 	_handles.clear()
 
 func _create_handle_node(world_pos: Vector3, dir: Vector2i) -> Node3D:
-	var root := Node3D.new()
+	var root = Node3D.new()
 	root.name = "RoomHandle"
 	root.position = world_pos
 
 	# Shaft (rectangular body of the arrow).
-	var shaft      := MeshInstance3D.new()
-	var shaft_mesh := BoxMesh.new()
+	var shaft      = MeshInstance3D.new()
+	var shaft_mesh = BoxMesh.new()
 	shaft_mesh.size     = Vector3(0.16, 0.16, 0.58)
 	shaft.mesh          = shaft_mesh
 	shaft.position      = Vector3(0.0, 0.0, 0.26)
@@ -580,8 +628,8 @@ func _create_handle_node(world_pos: Vector3, dir: Vector2i) -> Node3D:
 	root.add_child(shaft)
 
 	# Head (cone tip of the arrow).
-	var head      := MeshInstance3D.new()
-	var head_mesh := CylinderMesh.new()
+	var head      = MeshInstance3D.new()
+	var head_mesh = CylinderMesh.new()
 	head_mesh.top_radius     = 0.0
 	head_mesh.bottom_radius  = 0.22
 	head_mesh.height         = 0.34
@@ -593,8 +641,11 @@ func _create_handle_node(world_pos: Vector3, dir: Vector2i) -> Node3D:
 	head.cast_shadow        = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(head)
 
-	var host := get_parent() as Node3D
-	(host if host != null else self).add_child(root)
+	var host = get_parent() as Node3D
+	if host != null:
+		host.add_child(root)
+	else:
+		add_child(root)
 	root.look_at(root.global_position + _dir_to_world(dir), Vector3.UP)
 	return root
 
@@ -602,19 +653,19 @@ func _pick_handle_under_mouse() -> Dictionary:
 	if _handles.is_empty() or not _has_selected_room() or not _has_single_selected_room():
 		return {}
 
-	var camera := _get_camera()
+	var camera = _get_camera()
 	if camera == null:
 		return {}
 
-	var mouse_pos  := get_viewport().get_mouse_position()
-	var best_dist  := handle_pick_radius_px
+	var mouse_pos  = get_viewport().get_mouse_position()
+	var best_dist  = handle_pick_radius_px
 	var best: Dictionary = {}
 
 	for handle in _handles:
 		var world_pos: Vector3 = handle["handle_world"]
 		if camera.is_position_behind(world_pos):
 			continue
-		var dist := (camera.unproject_position(world_pos)).distance_to(mouse_pos)
+		var dist = (camera.unproject_position(world_pos)).distance_to(mouse_pos)
 		if dist <= best_dist:
 			best_dist = dist
 			best      = handle
@@ -625,7 +676,7 @@ func _pick_handle_under_mouse() -> Dictionary:
 # Geometry — wall runs (used for handle placement)
 # ---------------------------------------------------------------------------
 func _compute_wall_runs(tile_set: Dictionary) -> Array[Dictionary]:
-	var edges := _compute_boundary_edges(tile_set)
+	var edges = _compute_boundary_edges(tile_set)
 	if edges.is_empty():
 		return []
 
@@ -633,8 +684,8 @@ func _compute_wall_runs(tile_set: Dictionary) -> Array[Dictionary]:
 	# collinear adjacent edges are merged into runs.
 	var grouped: Dictionary = {}
 	for edge in edges:
-		var orientation := str(edge["orientation"])
-		var line        := int(edge["line"])
+		var orientation = str(edge["orientation"])
+		var line        = int(edge["line"])
 		var dir: Vector2i = edge["dir"]
 		var group_key: String
 		if orientation == "z":
@@ -655,9 +706,9 @@ func _compute_wall_runs(tile_set: Dictionary) -> Array[Dictionary]:
 		# Split the sorted edges into contiguous chunks, then split each chunk
 		# further at wall intersections so handles don't span doorways.
 		var chunk: Array = []
-		var prev_idx := -2147483648
+		var prev_idx = -2147483648
 		for edge in group_edges:
-			var idx := int(edge["idx"])
+			var idx = int(edge["idx"])
 			if chunk.is_empty() or idx == prev_idx + 1:
 				chunk.append(edge)
 			else:
@@ -680,14 +731,14 @@ func _split_chunk_by_intersections(chunk: Array) -> Array:
 		return [chunk]
 
 	var first: Dictionary = chunk[0]
-	var orientation := str(first["orientation"])
-	var line        := int(first["line"])
+	var orientation = str(first["orientation"])
+	var line        = int(first["line"])
 	var result: Array = []
 	var current: Array = [chunk[0]]
 
 	for i in range(1, chunk.size()):
 		var prev_edge: Dictionary = chunk[i - 1]
-		var vertex_idx := int(prev_edge["idx"]) + 1
+		var vertex_idx = int(prev_edge["idx"]) + 1
 		if _has_intersection_on_run_vertex(orientation, line, vertex_idx):
 			result.append(current)
 			current = []
@@ -698,30 +749,30 @@ func _split_chunk_by_intersections(chunk: Array) -> Array:
 	return result
 
 func _has_intersection_on_run_vertex(orientation: String, line: int, vertex_idx: int) -> bool:
-	var f := FloorManager.current_floor
+	var f = App.get_floor_service().current_floor
 
 	if orientation == "x":
 		# Horizontal run: check vertical wall segments meeting at this corner.
-		return (WallSystem.has_wall(Vector2i(vertex_idx - 1, line),     Vector2i(vertex_idx, line),     f) or
-				WallSystem.has_wall(Vector2i(vertex_idx - 1, line - 1), Vector2i(vertex_idx, line - 1), f))
+		return (App.get_wall_service().has_wall(Vector2i(vertex_idx - 1, line),     Vector2i(vertex_idx, line),     f) or
+				App.get_wall_service().has_wall(Vector2i(vertex_idx - 1, line - 1), Vector2i(vertex_idx, line - 1), f))
 
 	# Vertical run: check horizontal wall segments meeting at this corner.
-	return (WallSystem.has_wall(Vector2i(line,     vertex_idx - 1), Vector2i(line,     vertex_idx), f) or
-			WallSystem.has_wall(Vector2i(line - 1, vertex_idx - 1), Vector2i(line - 1, vertex_idx), f))
+	return (App.get_wall_service().has_wall(Vector2i(line,     vertex_idx - 1), Vector2i(line,     vertex_idx), f) or
+			App.get_wall_service().has_wall(Vector2i(line - 1, vertex_idx - 1), Vector2i(line - 1, vertex_idx), f))
 
 func _build_run_from_chunk(chunk: Array) -> Dictionary:
 	var first: Dictionary = chunk[0]
 	var last:  Dictionary = chunk[chunk.size() - 1]
-	var orientation := str(first["orientation"])
-	var line        := int(first["line"])
-	var start_idx   := int(first["idx"])
-	var end_idx     := int(last["idx"])
-	var length      := end_idx - start_idx + 1
+	var orientation = str(first["orientation"])
+	var line        = int(first["line"])
+	var start_idx   = int(first["idx"])
+	var end_idx     = int(last["idx"])
+	var length      = end_idx - start_idx + 1
 	var dir: Vector2i = first["dir"]
-	var y  := GridManager.get_wall_y_base(FloorManager.current_floor) + handle_height
-	var ts := GridManager.TILE_SIZE
+	var y  = App.get_grid_service().get_wall_y_base(App.get_floor_service().current_floor) + handle_height
+	var ts = App.get_grid_service().TILE_SIZE
 
-	var center := Vector3.ZERO
+	var center = Vector3.ZERO
 	if orientation == "z":
 		center = Vector3(float(line) * ts, y, (float(start_idx) + float(length) * 0.5) * ts)
 	else:
@@ -778,13 +829,13 @@ func _resize_tiles_from_handle(base_tiles: Dictionary, handle: Dictionary, steps
 	if steps == 0:
 		return base_tiles.duplicate(true)
 
-	var result  := base_tiles.duplicate(true)
-	var orientation := str(handle["orientation"])
-	var line        := int(handle["line"])
-	var start_idx   := int(handle["start_idx"])
-	var end_idx     := int(handle["end_idx"])
+	var result  = base_tiles.duplicate(true)
+	var orientation = str(handle["orientation"])
+	var line        = int(handle["line"])
+	var start_idx   = int(handle["start_idx"])
+	var end_idx     = int(handle["end_idx"])
 	var dir: Vector2i = handle["dir"]
-	var outward := 1 if steps > 0 else -1
+	var outward = 1 if steps > 0 else -1
 
 	for step_index in range(abs(steps)):
 		if orientation == "z":
@@ -796,7 +847,7 @@ func _resize_tiles_from_handle(base_tiles: Dictionary, handle: Dictionary, steps
 			else:
 				x_target = line - 1 - step_index if dir.x > 0 else line + step_index
 				for z in range(start_idx, end_idx + 1):
-					var tile := Vector2i(x_target, z)
+					var tile = Vector2i(x_target, z)
 					if not result.has(tile):
 						return {}
 					result.erase(tile)
@@ -809,7 +860,7 @@ func _resize_tiles_from_handle(base_tiles: Dictionary, handle: Dictionary, steps
 			else:
 				y_target = line - 1 - step_index if dir.y > 0 else line + step_index
 				for x in range(start_idx, end_idx + 1):
-					var tile := Vector2i(x, y_target)
+					var tile = Vector2i(x, y_target)
 					if not result.has(tile):
 						return {}
 					result.erase(tile)
@@ -830,7 +881,7 @@ func _is_connected(tile_set: Dictionary) -> bool:
 	if tile_set.is_empty():
 		return false
 
-	var start   := _first_tile(tile_set)
+	var start   = _first_tile(tile_set)
 	var queue:  Array[Vector2i] = [start]
 	var visited: Dictionary = {start: true}
 
@@ -853,7 +904,7 @@ func _boundary_wall_map(tile_set: Dictionary, floor_index: int) -> Dictionary:
 			var neighbor: Vector2i = tile + (offset_value as Vector2i)
 			if tile_set.has(neighbor):
 				continue
-			var key := WallSystem.make_key(tile, neighbor, floor_index)
+			var key = App.get_wall_service().make_key(tile, neighbor, floor_index)
 			if not map.has(key):
 				map[key] = {"from": tile, "to": neighbor}
 	return map
@@ -862,15 +913,15 @@ func _boundary_wall_map(tile_set: Dictionary, floor_index: int) -> Dictionary:
 # Room detection helpers
 # ---------------------------------------------------------------------------
 func _detect_room_entries_on_floor() -> Array[Dictionary]:
-	var detector: Node = WallSystem.get_room_detector()
+	var detector: Node = App.get_wall_service().get_room_detector()
 	if detector == null:
 		return []
 
 	var entries: Array[Dictionary] = []
-	for room_value in detector.detect_all_rooms_on_floor(FloorManager.current_floor):
+	for room_value in detector.detect_all_rooms_on_floor(App.get_floor_service().current_floor):
 		if not (room_value is Array):
 			continue
-		var room_set := _array_to_set(room_value)
+		var room_set = _array_to_set(room_value)
 		if room_set.is_empty():
 			continue
 		entries.append({
@@ -898,7 +949,7 @@ func _is_subset(subset_tiles: Dictionary, container_tiles: Dictionary) -> bool:
 func _union_room_tiles_by_indices(current_rooms: Array[Dictionary], room_indices: Array[int]) -> Dictionary:
 	var result: Dictionary = {}
 	for idx_value in room_indices:
-		var idx := int(idx_value)
+		var idx = int(idx_value)
 		if idx < 0 or idx >= current_rooms.size():
 			continue
 		var room_tiles: Dictionary = current_rooms[idx].get("tiles", {})
@@ -912,8 +963,8 @@ func _compute_enclosed_void_tiles(tile_set: Dictionary) -> Dictionary:
 	if tile_set.is_empty():
 		return enclosed
 
-	var min_x := 2147483647;  var max_x := -2147483648
-	var min_y := 2147483647;  var max_y := -2147483648
+	var min_x = 2147483647;  var max_x = -2147483648
+	var min_y = 2147483647;  var max_y = -2147483648
 	for tile_value in tile_set.keys():
 		var tile: Vector2i = tile_value
 		min_x = mini(min_x, tile.x);  max_x = maxi(max_x, tile.x)
@@ -923,21 +974,21 @@ func _compute_enclosed_void_tiles(tile_set: Dictionary) -> Dictionary:
 	var queue: Array[Vector2i] = []
 
 	for x in range(min_x, max_x + 1):
-		var top := Vector2i(x, min_y)
+		var top = Vector2i(x, min_y)
 		if not tile_set.has(top) and not exterior.has(top):
 			exterior[top] = true
 			queue.append(top)
-		var bottom := Vector2i(x, max_y)
+		var bottom = Vector2i(x, max_y)
 		if not tile_set.has(bottom) and not exterior.has(bottom):
 			exterior[bottom] = true
 			queue.append(bottom)
 
 	for y in range(min_y, max_y + 1):
-		var left := Vector2i(min_x, y)
+		var left = Vector2i(min_x, y)
 		if not tile_set.has(left) and not exterior.has(left):
 			exterior[left] = true
 			queue.append(left)
-		var right := Vector2i(max_x, y)
+		var right = Vector2i(max_x, y)
 		if not tile_set.has(right) and not exterior.has(right):
 			exterior[right] = true
 			queue.append(right)
@@ -955,7 +1006,7 @@ func _compute_enclosed_void_tiles(tile_set: Dictionary) -> Dictionary:
 
 	for x in range(min_x, max_x + 1):
 		for y in range(min_y, max_y + 1):
-			var probe := Vector2i(x, y)
+			var probe = Vector2i(x, y)
 			if tile_set.has(probe) or exterior.has(probe):
 				continue
 			enclosed[probe] = true
@@ -964,7 +1015,7 @@ func _compute_enclosed_void_tiles(tile_set: Dictionary) -> Dictionary:
 
 func _find_enclosed_nested_room_indices(current_rooms: Array[Dictionary], selected_lookup: Dictionary, base_tiles: Dictionary) -> Array[int]:
 	var nested: Array[int] = []
-	var enclosed_void := _compute_enclosed_void_tiles(base_tiles)
+	var enclosed_void = _compute_enclosed_void_tiles(base_tiles)
 	if enclosed_void.is_empty():
 		return nested
 
@@ -980,7 +1031,7 @@ func _find_enclosed_nested_room_indices(current_rooms: Array[Dictionary], select
 	return nested
 
 func _adjacency_score(tile: Vector2i, tile_set: Dictionary) -> int:
-	var score := 0
+	var score = 0
 	for offset_value in NEIGHBORS:
 		if tile_set.has(tile + (offset_value as Vector2i)):
 			score += 1
@@ -1011,7 +1062,7 @@ func _find_room_entry_index_along_freed_ray(
 	) -> int:
 	# Walk along dir, skipping over freed tiles, to find the first live tile
 	# and identify which room it belongs to.
-	var probe := start_tile + dir
+	var probe = start_tile + dir
 	while freed_tiles.has(probe):
 		probe += dir
 	return _find_room_entry_index_for_tile(probe, room_entries, use_original_tiles)
@@ -1031,10 +1082,10 @@ func _compute_resize_transfer_candidates(
 		var tile: Vector2i = tile_value
 		for offset_value in NEIGHBORS:
 			var offset: Vector2i = offset_value
-			var inside := tile - offset
+			var inside = tile - offset
 			if not target_tiles.has(inside):
 				continue
-			var room_idx := _find_room_entry_index_along_freed_ray(tile, offset, freed_tiles, room_entries, true)
+			var room_idx = _find_room_entry_index_along_freed_ray(tile, offset, freed_tiles, room_entries, true)
 			if room_idx >= 0:
 				candidates[room_idx] = true
 	return candidates
@@ -1053,10 +1104,10 @@ func _collect_resize_transfer_seed_tiles(
 		var tile: Vector2i = tile_value
 		for offset_value in NEIGHBORS:
 			var offset: Vector2i = offset_value
-			var inside := tile - offset
+			var inside = tile - offset
 			if not target_tiles.has(inside):
 				continue
-			var room_idx := _find_room_entry_index_along_freed_ray(tile, offset, freed_tiles, room_entries, true)
+			var room_idx = _find_room_entry_index_along_freed_ray(tile, offset, freed_tiles, room_entries, true)
 			if room_idx >= 0 and allowed_indices.has(room_idx):
 				seeds[tile] = true
 				break
@@ -1093,7 +1144,7 @@ func _distribute_freed_tiles_to_neighbors(
 	) -> void:
 	# Wave-based assignment: each pass assigns tiles that are adjacent to an
 	# already-known room, propagating inward until all freed tiles are absorbed.
-	var pending := freed_tiles.duplicate(true)
+	var pending = freed_tiles.duplicate(true)
 
 	while not pending.is_empty():
 		var assigned_tiles: Array[Vector2i] = []
@@ -1106,23 +1157,23 @@ func _distribute_freed_tiles_to_neighbors(
 
 		for tile_value in pending_tiles:
 			var tile: Vector2i = tile_value
-			var best_index    := -1
-			var best_original := 0
-			var best_current  := 0
-			var best_signature := ""
+			var best_index    = -1
+			var best_original = 0
+			var best_current  = 0
+			var best_signature = ""
 
 			for i in range(room_entries.size()):
 				if not allowed_indices.is_empty() and not allowed_indices.has(i):
 					continue
 				var entry: Dictionary = room_entries[i]
-				var scores   := _room_assignment_scores(tile, entry)
-				var orig_sc  := int(scores["original"])
-				var curr_sc  := int(scores["current"])
+				var scores   = _room_assignment_scores(tile, entry)
+				var orig_sc  = int(scores["original"])
+				var curr_sc  = int(scores["current"])
 				if orig_sc <= 0 and curr_sc <= 0:
 					continue
 
-				var sig     := str(entry.get("signature", ""))
-				var better  := false
+				var sig     = str(entry.get("signature", ""))
+				var better  = false
 				if   orig_sc > best_original: better = true
 				elif orig_sc == best_original and curr_sc > best_current: better = true
 				elif orig_sc == best_original and curr_sc == best_current:
@@ -1152,10 +1203,10 @@ func _distribute_freed_tiles_to_neighbors(
 
 func _split_into_components(tile_set: Dictionary) -> Array[Dictionary]:
 	var components: Array[Dictionary] = []
-	var unvisited := tile_set.duplicate(true)
+	var unvisited = tile_set.duplicate(true)
 
 	while not unvisited.is_empty():
-		var start   := _first_tile(unvisited)
+		var start   = _first_tile(unvisited)
 		var queue:  Array[Vector2i] = [start]
 		var component: Dictionary = {start: true}
 		unvisited.erase(start)
@@ -1180,7 +1231,7 @@ func _split_room_entries_into_components(room_entries: Array[Dictionary]) -> Arr
 		var tiles: Dictionary = entry["tiles"]
 		if tiles.is_empty():
 			continue
-		var component_idx := 0
+		var component_idx = 0
 		for component in _split_into_components(tiles):
 			result.append({
 				"signature": "%s#%d" % [str(entry["signature"]), component_idx],
@@ -1211,25 +1262,25 @@ func _union_boundary_map(room_entries: Array[Dictionary], floor_index: int) -> D
 # Adaptive plan — computes which wall edges to add/remove for a move or resize
 # ---------------------------------------------------------------------------
 func _build_adaptive_plan(base_tiles: Dictionary, target_tiles: Dictionary, is_resize: bool) -> Dictionary:
-	var floor_index    := FloorManager.current_floor
-	var current_rooms  := _detect_room_entries_on_floor()
+	var floor_index    = App.get_floor_service().current_floor
+	var current_rooms  = _detect_room_entries_on_floor()
 	if current_rooms.is_empty():
 		return {"valid": false}
 
 	# ---- Identify which current rooms are part of the selection ----
-	var selected_indices := _find_selected_room_indices(current_rooms, base_tiles)
+	var selected_indices = _find_selected_room_indices(current_rooms, base_tiles)
 	if selected_indices.is_empty():
 		return {"valid": false}
 
 	if is_resize and selected_indices.size() != 1:
 		return {"valid": false}
 
-	var selected_lookup := _array_to_int_lookup(selected_indices)
+	var selected_lookup = _array_to_int_lookup(selected_indices)
 
 	# ---- Compute move delta (not needed for resize) ----
-	var move_delta := Vector2i.ZERO
+	var move_delta = Vector2i.ZERO
 	if not is_resize:
-		var move_info := _compute_uniform_translation(base_tiles, target_tiles)
+		var move_info = _compute_uniform_translation(base_tiles, target_tiles)
 		if not bool(move_info.get("valid", false)):
 			return {"valid": false}
 		move_delta = move_info["delta"]
@@ -1241,7 +1292,7 @@ func _build_adaptive_plan(base_tiles: Dictionary, target_tiles: Dictionary, is_r
 
 	selected_indices.sort()
 
-	var selected_source_tiles := _union_room_tiles_by_indices(current_rooms, selected_indices)
+	var selected_source_tiles = _union_room_tiles_by_indices(current_rooms, selected_indices)
 	if selected_source_tiles.is_empty():
 		selected_source_tiles = base_tiles.duplicate(true)
 
@@ -1263,7 +1314,7 @@ func _build_adaptive_plan(base_tiles: Dictionary, target_tiles: Dictionary, is_r
 		if selected_lookup.has(i):
 			continue  # The selected room is handled separately below.
 
-		var other_tiles := old_tiles.duplicate(true)
+		var other_tiles = old_tiles.duplicate(true)
 		if not is_resize:
 			# Move: ensure the target area is not already occupied.
 			for tile_value in move_target_tiles.keys():
@@ -1282,11 +1333,11 @@ func _build_adaptive_plan(base_tiles: Dictionary, target_tiles: Dictionary, is_r
 
 	# ---- For resize: redistribute freed tiles to adjacent rooms ----
 	if is_resize:
-		var freed_tiles := _set_difference(base_tiles, target_tiles)
-		var transfer_candidates := _compute_resize_transfer_candidates(freed_tiles, target_tiles, working_others)
+		var freed_tiles = _set_difference(base_tiles, target_tiles)
+		var transfer_candidates = _compute_resize_transfer_candidates(freed_tiles, target_tiles, working_others)
 		if not transfer_candidates.is_empty():
-			var transfer_seeds      := _collect_resize_transfer_seed_tiles(freed_tiles, target_tiles, working_others, transfer_candidates)
-			var transferable_tiles  := _expand_seeded_freed_tiles(transfer_seeds, freed_tiles)
+			var transfer_seeds      = _collect_resize_transfer_seed_tiles(freed_tiles, target_tiles, working_others, transfer_candidates)
+			var transferable_tiles  = _expand_seeded_freed_tiles(transfer_seeds, freed_tiles)
 			if not transferable_tiles.is_empty():
 				_distribute_freed_tiles_to_neighbors(transferable_tiles, working_others, transfer_candidates)
 
@@ -1298,7 +1349,7 @@ func _build_adaptive_plan(base_tiles: Dictionary, target_tiles: Dictionary, is_r
 	)
 
 	# ---- Diff old vs new boundary to get wall mutations ----
-	var diff := _diff_boundaries(old_entries, new_entries, floor_index)
+	var diff = _diff_boundaries(old_entries, new_entries, floor_index)
 	diff["selected_source_tiles"] = selected_source_tiles
 	return diff
 
@@ -1340,7 +1391,7 @@ func _build_new_room_entries(
 		new_entries.append({"signature": "selected", "tiles": target_tiles.duplicate(true)})
 	else:
 		for idx in selected_indices:
-			var moved_tiles := _offset_tiles((current_rooms[idx]["tiles"] as Dictionary).duplicate(true), move_delta)
+			var moved_tiles = _offset_tiles((current_rooms[idx]["tiles"] as Dictionary).duplicate(true), move_delta)
 			if not moved_tiles.is_empty():
 				new_entries.append({"signature": "selected_%d" % [idx], "tiles": moved_tiles})
 
@@ -1361,8 +1412,8 @@ func _diff_boundaries(
 		new_entries: Array[Dictionary],
 		floor_index: int
 	) -> Dictionary:
-	var old_boundary := _union_boundary_map(old_entries, floor_index)
-	var new_boundary := _union_boundary_map(new_entries, floor_index)
+	var old_boundary = _union_boundary_map(old_entries, floor_index)
+	var new_boundary = _union_boundary_map(new_entries, floor_index)
 
 	var remove_edges: Array[Dictionary] = []
 	var add_edges:    Array[Dictionary] = []
@@ -1381,23 +1432,23 @@ func _diff_boundaries(
 # Wall placement validation
 # ---------------------------------------------------------------------------
 func _can_place_wall_ignoring_furniture(a: Vector2i, b: Vector2i, floor_index: int) -> bool:
-	var diff := b - a
+	var diff = b - a
 	if abs(diff.x) + abs(diff.y) != 1:
 		return false
-	if WallSystem.has_wall(a, b, floor_index):
+	if App.get_wall_service().has_wall(a, b, floor_index):
 		return false
 	if floor_index > 0 and not _is_segment_within_live_floor_limit(a, b, floor_index - 1, 2):
-		if not WallSystem.has_wall(a, b, floor_index - 1):
+		if not App.get_wall_service().has_wall(a, b, floor_index - 1):
 			return false
 	return true
 
 func _compute_live_floor_bounds(floor_index: int) -> Dictionary:
-	var min_x := 2147483647;  var max_x := -2147483648
-	var min_y := 2147483647;  var max_y := -2147483648
-	var has_any := false
+	var min_x = 2147483647;  var max_x = -2147483648
+	var min_y = 2147483647;  var max_y = -2147483648
+	var has_any = false
 
-	for key in WallSystem.get_wall_keys_for_floor(floor_index):
-		var wall_data = WallSystem.get_wall_by_key(key)
+	for key in App.get_wall_service().get_wall_keys_for_floor(floor_index):
+		var wall_data = App.get_wall_service().get_wall_by_key(key)
 		if wall_data == null:
 			continue
 		has_any = true
@@ -1419,7 +1470,7 @@ func _point_within_bounds(point: Vector2i, bounds: Dictionary, margin: int) -> b
 			point.y <= int(bounds["max_y"]) + margin)
 
 func _is_segment_within_live_floor_limit(a: Vector2i, b: Vector2i, floor_index: int, margin: int) -> bool:
-	var bounds := _compute_live_floor_bounds(floor_index)
+	var bounds = _compute_live_floor_bounds(floor_index)
 	return bool(bounds.get("valid", false)) and _point_within_bounds(a, bounds, margin) and _point_within_bounds(b, bounds, margin)
 
 func _validate_plan_edges(add_edges: Array[Dictionary], allow_furniture_removal: bool) -> bool:
@@ -1431,36 +1482,36 @@ func _array_to_int_lookup(ids: Array[int]) -> Dictionary:
 		lookup[int(id_value)] = true
 	return lookup
 
-func _edge_blocked_only_by_moving_objects(from_tile: Vector2i, to_tile: Vector2i, moving_ids_lookup: Dictionary) -> bool:
-	if FurnitureSystem == null or not FurnitureSystem.has_method("get_snapshots_blocking_wall"):
+func _edge_blocked_only_by_moving_objects(from_tile: Vector2i, to_tile: Vector2i, floor_index: int, moving_ids_lookup: Dictionary) -> bool:
+	if App.get_furniture_service() == null or not App.get_furniture_service().has_method("get_snapshots_blocking_wall"):
 		return false
-	var snapshots: Array = FurnitureSystem.call("get_snapshots_blocking_wall", from_tile, to_tile)
+	var snapshots: Array = App.get_furniture_service().call("get_snapshots_blocking_wall", from_tile, to_tile, floor_index)
 	if snapshots.is_empty():
 		return false
 	for snapshot_value in snapshots:
 		if not (snapshot_value is Dictionary):
 			return false
-		var node_id := int((snapshot_value as Dictionary).get("node_id", -1))
+		var node_id = int((snapshot_value as Dictionary).get("node_id", -1))
 		if node_id < 0 or not moving_ids_lookup.has(node_id):
 			return false
 	return true
 
 func _validate_plan_edges_with_moving(add_edges: Array[Dictionary], allow_furniture_removal: bool, moving_ids_lookup: Dictionary) -> bool:
-	var floor_index := FloorManager.current_floor
+	var floor_index = App.get_floor_service().current_floor
 	for edge in add_edges:
 		var from_tile: Vector2i = edge["from"]
 		var to_tile:   Vector2i = edge["to"]
-		if WallSystem.has_wall(from_tile, to_tile, floor_index):
+		if App.get_wall_service().has_wall(from_tile, to_tile, floor_index):
 			continue
-		if WallSystem.can_place_wall(from_tile, to_tile, floor_index):
+		if App.get_wall_service().can_place_wall(from_tile, to_tile, floor_index):
 			continue
-		if allow_furniture_removal and FurnitureSystem != null and FurnitureSystem.has_method("has_furniture_blocking_wall"):
-			if bool(FurnitureSystem.call("has_furniture_blocking_wall", from_tile, to_tile)):
+		if allow_furniture_removal and App.get_furniture_service() != null and App.get_furniture_service().has_method("has_furniture_blocking_wall"):
+			if bool(App.get_furniture_service().call("has_furniture_blocking_wall", from_tile, to_tile, floor_index)):
 				if _can_place_wall_ignoring_furniture(from_tile, to_tile, floor_index):
 					continue
 		if (not allow_furniture_removal and not moving_ids_lookup.is_empty()
 				and _can_place_wall_ignoring_furniture(from_tile, to_tile, floor_index)):
-			if _edge_blocked_only_by_moving_objects(from_tile, to_tile, moving_ids_lookup):
+			if _edge_blocked_only_by_moving_objects(from_tile, to_tile, floor_index, moving_ids_lookup):
 				continue
 		return false
 	return true
@@ -1469,10 +1520,10 @@ func _compute_uniform_translation(base_tiles: Dictionary, target_tiles: Dictiona
 	if base_tiles.is_empty() or target_tiles.is_empty() or base_tiles.size() != target_tiles.size():
 		return {"valid": false}
 
-	var first_base := _first_tile(base_tiles)
+	var first_base = _first_tile(base_tiles)
 	for target_value in target_tiles.keys():
-		var delta := (target_value as Vector2i) - first_base
-		var all_match := true
+		var delta = (target_value as Vector2i) - first_base
+		var all_match = true
 		for base_value in base_tiles.keys():
 			if not target_tiles.has((base_value as Vector2i) + delta):
 				all_match = false
@@ -1487,7 +1538,7 @@ func _dedupe_snapshot_array(snapshots: Array[Dictionary]) -> Array[Dictionary]:
 	for snapshot in snapshots:
 		if snapshot.is_empty():
 			continue
-		var node_id := int(snapshot.get("node_id", -1))
+		var node_id = int(snapshot.get("node_id", -1))
 		if node_id >= 0:
 			by_id[node_id] = snapshot
 	var deduped: Array[Dictionary] = []
@@ -1497,20 +1548,20 @@ func _dedupe_snapshot_array(snapshots: Array[Dictionary]) -> Array[Dictionary]:
 
 func _collect_resize_furniture_removals(add_edges: Array[Dictionary]) -> Array[Dictionary]:
 	var snapshots: Array[Dictionary] = []
-	if FurnitureSystem == null:
+	if App.get_furniture_service() == null:
 		return snapshots
-	if not FurnitureSystem.has_method("has_furniture_blocking_wall") or not FurnitureSystem.has_method("get_snapshots_blocking_wall"):
+	if not App.get_furniture_service().has_method("has_furniture_blocking_wall") or not App.get_furniture_service().has_method("get_snapshots_blocking_wall"):
 		return snapshots
 
-	var floor_index := FloorManager.current_floor
+	var floor_index = App.get_floor_service().current_floor
 	for edge in add_edges:
 		var from_tile: Vector2i = edge["from"]
 		var to_tile:   Vector2i = edge["to"]
-		if WallSystem.has_wall(from_tile, to_tile, floor_index):
+		if App.get_wall_service().has_wall(from_tile, to_tile, floor_index):
 			continue
-		if not bool(FurnitureSystem.call("has_furniture_blocking_wall", from_tile, to_tile)):
+		if not bool(App.get_furniture_service().call("has_furniture_blocking_wall", from_tile, to_tile, floor_index)):
 			continue
-		for snapshot_value in (FurnitureSystem.call("get_snapshots_blocking_wall", from_tile, to_tile) as Array):
+		for snapshot_value in (App.get_furniture_service().call("get_snapshots_blocking_wall", from_tile, to_tile, floor_index) as Array):
 			if snapshot_value is Dictionary:
 				snapshots.append(snapshot_value)
 
@@ -1522,24 +1573,24 @@ func _collect_resize_furniture_removals(add_edges: Array[Dictionary]) -> Array[D
 func _build_projected_wall_maps(plan: Dictionary) -> Dictionary:
 	var projected: Dictionary = {}
 
-	for key in WallSystem.get_all_wall_keys():
-		var floor := WallSystem.get_floor_from_key(key)
-		if not projected.has(floor):
-			projected[floor] = {}
-		var wall_data = WallSystem.get_wall_by_key(key)
+	for key in App.get_wall_service().get_all_wall_keys():
+		var floor_index = App.get_wall_service().get_floor_from_key(key)
+		if not projected.has(floor_index):
+			projected[floor_index] = {}
+		var wall_data = App.get_wall_service().get_wall_by_key(key)
 		if wall_data == null:
 			continue
-		(projected[floor] as Dictionary)[key] = {"from": wall_data.from_tile, "to": wall_data.to_tile}
+		(projected[floor_index] as Dictionary)[key] = {"from": wall_data.from_tile, "to": wall_data.to_tile}
 
-	var current_floor := FloorManager.current_floor
+	var current_floor = App.get_floor_service().current_floor
 	if not projected.has(current_floor):
 		projected[current_floor] = {}
 	var floor_map: Dictionary = projected[current_floor]
 
 	for edge in plan.get("remove_edges", []):
-		floor_map.erase(WallSystem.make_key(edge["from"], edge["to"], current_floor))
+		floor_map.erase(App.get_wall_service().make_key(edge["from"], edge["to"], current_floor))
 	for edge in plan.get("add_edges", []):
-		floor_map[WallSystem.make_key(edge["from"], edge["to"], current_floor)] = {"from": edge["from"], "to": edge["to"]}
+		floor_map[App.get_wall_service().make_key(edge["from"], edge["to"], current_floor)] = {"from": edge["from"], "to": edge["to"]}
 
 	projected[current_floor] = floor_map
 	return projected
@@ -1548,8 +1599,8 @@ func _compute_projected_floor_bounds(floor_map: Dictionary) -> Dictionary:
 	if floor_map.is_empty():
 		return {"valid": false}
 
-	var min_x := 2147483647;  var max_x := -2147483648
-	var min_y := 2147483647;  var max_y := -2147483648
+	var min_x = 2147483647;  var max_x = -2147483648
+	var min_y = 2147483647;  var max_y = -2147483648
 
 	for edge in floor_map.values():
 		var from_tile: Vector2i = edge["from"]
@@ -1562,12 +1613,12 @@ func _compute_projected_floor_bounds(floor_map: Dictionary) -> Dictionary:
 	return {"valid": true, "min_x": min_x, "min_y": min_y, "max_x": max_x, "max_y": max_y}
 
 func _is_supported_in_projected(a: Vector2i, b: Vector2i, floor_index: int, projected: Dictionary, bounds_cache: Dictionary) -> bool:
-	var below_floor := floor_index - 1
+	var below_floor = floor_index - 1
 	if below_floor < 0:
 		return true
 
 	if projected.has(below_floor):
-		if (projected[below_floor] as Dictionary).has(WallSystem.make_key(a, b, below_floor)):
+		if (projected[below_floor] as Dictionary).has(App.get_wall_service().make_key(a, b, below_floor)):
 			return true
 
 	if not bounds_cache.has(below_floor):
@@ -1577,15 +1628,15 @@ func _is_supported_in_projected(a: Vector2i, b: Vector2i, floor_index: int, proj
 	return _point_within_bounds(a, bounds, 2) and _point_within_bounds(b, bounds, 2)
 
 func _validate_upper_floors_after_resize(plan: Dictionary) -> bool:
-	if FloorManager.current_floor >= FloorManager.MAX_FLOORS - 1:
+	if App.get_floor_service().current_floor >= App.get_floor_service().MAX_FLOORS - 1:
 		return true
 
-	var projected    := _build_projected_wall_maps(plan)
+	var projected    = _build_projected_wall_maps(plan)
 	var bounds_cache: Dictionary = {}
 
 	for floor_value in projected.keys():
-		var floor_index := int(floor_value)
-		if floor_index <= FloorManager.current_floor:
+		var floor_index = int(floor_value)
+		if floor_index <= App.get_floor_service().current_floor:
 			continue
 		for edge in (projected[floor_index] as Dictionary).values():
 			if not _is_supported_in_projected(edge["from"], edge["to"], floor_index, projected, bounds_cache):
@@ -1597,14 +1648,14 @@ func _validate_upper_floors_after_resize(plan: Dictionary) -> bool:
 # Opening (door/window) snapshot & restore
 # ---------------------------------------------------------------------------
 func _wall_centerline_world(from_tile: Vector2i, to_tile: Vector2i) -> Dictionary:
-	var from_world := GridManager.tile_to_world(from_tile)
-	var to_world   := GridManager.tile_to_world(to_tile)
-	var midpoint   := (from_world + to_world) * 0.5
-	var is_parallel_z := (to_tile - from_tile).x != 0
-	var half_len := GridManager.TILE_SIZE * 0.5
+	var from_world = App.get_grid_service().tile_to_world(from_tile)
+	var to_world   = App.get_grid_service().tile_to_world(to_tile)
+	var midpoint   = (from_world + to_world) * 0.5
+	var is_parallel_z = (to_tile - from_tile).x != 0
+	var half_len = App.get_grid_service().TILE_SIZE * 0.5
 
-	var start_world := midpoint
-	var end_world   := midpoint
+	var start_world = midpoint
+	var end_world   = midpoint
 	if is_parallel_z:
 		start_world.z -= half_len;  end_world.z += half_len
 	else:
@@ -1613,56 +1664,114 @@ func _wall_centerline_world(from_tile: Vector2i, to_tile: Vector2i) -> Dictionar
 	return {"start_world": start_world, "end_world": end_world}
 
 func _opening_world_position(from_tile: Vector2i, to_tile: Vector2i, offset_t: float, floor_index: int) -> Vector3:
-	var line    := _wall_centerline_world(from_tile, to_tile)
-	var pos     := (line["start_world"] as Vector3).lerp(line["end_world"], clampf(offset_t, 0.0, 1.0))
-	pos.y = GridManager.get_wall_y_base(floor_index)
+	var line    = _wall_centerline_world(from_tile, to_tile)
+	var pos     = (line["start_world"] as Vector3).lerp(line["end_world"], clampf(offset_t, 0.0, 1.0))
+	pos.y = App.get_grid_service().get_wall_y_base(floor_index)
 	return pos
 
 func _snapshot_room_openings(base_tiles: Dictionary) -> Array[Dictionary]:
 	var snapshots: Array[Dictionary] = []
-	var opening_system := get_node_or_null("/root/OpeningSystem")
+	var opening_system = App.get_opening_service()
 	if opening_system == null:
 		return snapshots
 
-	var floor_index := FloorManager.current_floor
-	for wall_key in _boundary_wall_map(base_tiles, floor_index).keys():
+	var floor_index = App.get_floor_service().current_floor
+	var boundary_map = _boundary_wall_map(base_tiles, floor_index)
+	for wall_key in boundary_map.keys():
 		if not bool(opening_system.call("has_opening", wall_key)):
 			continue
 		var opening = opening_system.call("get_opening", wall_key)
 		if opening == null:
 			continue
-		var wall_data = WallSystem.get_wall_by_key(wall_key)
+		var wall_data = App.get_wall_service().get_wall_by_key(wall_key)
 		if wall_data == null:
 			continue
+		var boundary_edge: Dictionary = boundary_map.get(wall_key, {})
+		var boundary_from: Vector2i = boundary_edge.get("from", wall_data.from_tile)
+		var boundary_to: Vector2i = boundary_edge.get("to", wall_data.to_tile)
 		snapshots.append({
+			"wall_key":   wall_key,
+			"from_tile":  wall_data.from_tile,
+			"to_tile":    wall_data.to_tile,
+			"offset_t":   float(opening.offset_t),
 			"type":       str(opening.type),
 			"scene_path": str(opening.scene_path),
 			"floor":      floor_index,
+			"boundary_dir": boundary_to - boundary_from,
 			"world_pos":  _opening_world_position(wall_data.from_tile, wall_data.to_tile, float(opening.offset_t), floor_index),
 		})
 	return snapshots
 
-func _find_wall_for_opening_position(world_pos: Vector3, floor_index: int) -> Dictionary:
-	var best_dist := INF
-	var best: Dictionary = {}
-	var p := Vector2(world_pos.x, world_pos.z)
+func _wall_is_parallel_z(from_tile: Vector2i, to_tile: Vector2i) -> bool:
+	return (to_tile - from_tile).x != 0
 
-	for wall_key in WallSystem.get_wall_keys_for_floor(floor_index):
-		var wall_data = WallSystem.get_wall_by_key(wall_key)
-		if wall_data == null:
+func _find_best_resize_wall_for_opening(snapshot: Dictionary, target_boundary: Dictionary) -> Dictionary:
+	var floor_index = int(snapshot.get("floor", App.get_floor_service().current_floor))
+	var old_from: Vector2i = snapshot.get("from_tile", Vector2i.ZERO)
+	var old_to:   Vector2i = snapshot.get("to_tile",   Vector2i.ZERO)
+	var old_parallel_z = _wall_is_parallel_z(old_from, old_to)
+	var old_world_pos: Vector3 = snapshot.get("world_pos", Vector3.ZERO)
+	var expected_dir: Vector2i = snapshot.get("boundary_dir", Vector2i.ZERO)
+
+	var p = Vector2(old_world_pos.x, old_world_pos.z)
+	var best_dist = INF
+	var best: Dictionary = {}
+
+	for wall_key in target_boundary.keys():
+		var boundary_edge: Dictionary = target_boundary[wall_key]
+		var candidate_dir: Vector2i = boundary_edge.get("to", Vector2i.ZERO) - boundary_edge.get("from", Vector2i.ZERO)
+		if expected_dir != Vector2i.ZERO and candidate_dir != expected_dir:
 			continue
 
-		var line        := _wall_centerline_world(wall_data.from_tile, wall_data.to_tile)
-		var a           := Vector2((line["start_world"] as Vector3).x, (line["start_world"] as Vector3).z)
-		var b           := Vector2((line["end_world"]   as Vector3).x, (line["end_world"]   as Vector3).z)
-		var ab          := b - a
-		var len_sq      := ab.length_squared()
+		var wall_data = App.get_wall_service().get_wall_by_key(wall_key)
+		if wall_data == null:
+			continue
+		if _wall_is_parallel_z(wall_data.from_tile, wall_data.to_tile) != old_parallel_z:
+			continue
+
+		var line        = _wall_centerline_world(wall_data.from_tile, wall_data.to_tile)
+		var a           = Vector2((line["start_world"] as Vector3).x, (line["start_world"] as Vector3).z)
+		var b           = Vector2((line["end_world"]   as Vector3).x, (line["end_world"]   as Vector3).z)
+		var ab          = b - a
+		var len_sq      = ab.length_squared()
 		if len_sq <= 0.0001:
 			continue
 
-		var offset_t := clampf((p - a).dot(ab) / len_sq, 0.05, 0.95)
-		var dist     := a.lerp(b, offset_t).distance_to(p)
-		if dist >= GridManager.TILE_SIZE * 0.4 or dist >= best_dist:
+		var offset_t = clampf((p - a).dot(ab) / len_sq, 0.05, 0.95)
+		var dist     = a.lerp(b, offset_t).distance_to(p)
+		if dist >= best_dist:
+			continue
+
+		best_dist = dist
+		best = {
+			"wall_key": wall_key,
+			"offset_t": offset_t,
+			"floor": floor_index,
+		}
+
+	return best
+
+func _find_wall_for_opening_position(world_pos: Vector3, floor_index: int) -> Dictionary:
+	var best_dist = INF
+	var best: Dictionary = {}
+	var p = Vector2(world_pos.x, world_pos.z)
+
+	for wall_key in App.get_wall_service().get_wall_keys_for_floor(floor_index):
+		var wall_data = App.get_wall_service().get_wall_by_key(wall_key)
+		if wall_data == null:
+			continue
+
+		var line        = _wall_centerline_world(wall_data.from_tile, wall_data.to_tile)
+		var a           = Vector2((line["start_world"] as Vector3).x, (line["start_world"] as Vector3).z)
+		var b           = Vector2((line["end_world"]   as Vector3).x, (line["end_world"]   as Vector3).z)
+		var ab          = b - a
+		var len_sq      = ab.length_squared()
+		if len_sq <= 0.0001:
+			continue
+
+		var offset_t = clampf((p - a).dot(ab) / len_sq, 0.05, 0.95)
+		var dist     = a.lerp(b, offset_t).distance_to(p)
+		if dist >= App.get_grid_service().TILE_SIZE * 0.4 or dist >= best_dist:
 			continue
 
 		best_dist = dist
@@ -1670,29 +1779,38 @@ func _find_wall_for_opening_position(world_pos: Vector3, floor_index: int) -> Di
 
 	return best
 
-func _restore_openings_from_snapshots(snapshots: Array[Dictionary]) -> void:
+func _restore_openings_from_snapshots(snapshots: Array[Dictionary], room_tiles: Dictionary) -> void:
 	if snapshots.is_empty():
 		return
-	var opening_system := get_node_or_null("/root/OpeningSystem")
+	var opening_system = App.get_opening_service()
+	if opening_system == null:
+		return
+
+	var floor_index = App.get_floor_service().current_floor
+	var target_boundary = _boundary_wall_map(room_tiles, floor_index)
 
 	for snapshot in snapshots:
-		var floor_index := int(snapshot.get("floor", FloorManager.current_floor))
-		var world_pos: Vector3 = snapshot.get("world_pos", Vector3.ZERO)
-		_clear_detached_opening_near(world_pos)
-
-		if opening_system == null:
-			_spawn_detached_opening(snapshot)
+		var snapshot_floor = int(snapshot.get("floor", floor_index))
+		if snapshot_floor != floor_index:
 			continue
 
-		var found := _find_wall_for_opening_position(world_pos, floor_index)
+		var preferred_key = str(snapshot.get("wall_key", ""))
+		if preferred_key != "" and target_boundary.has(preferred_key) and App.get_wall_service().get_wall_by_key(preferred_key) != null:
+			if bool(opening_system.call("has_opening", preferred_key)):
+				continue
+			opening_system.call("place_opening", preferred_key,
+				str(snapshot.get("type", "door")),
+				float(snapshot.get("offset_t", 0.5)),
+				str(snapshot.get("scene_path", "")))
+			continue
+
+		var found = _find_best_resize_wall_for_opening(snapshot, target_boundary)
 		if found.is_empty():
-			_spawn_detached_opening(snapshot)
 			continue
 
-		var wall_key := str(found["wall_key"])
+		var wall_key = str(found["wall_key"])
 		if bool(opening_system.call("has_opening", wall_key)):
 			continue
-
 		opening_system.call("place_opening", wall_key,
 			str(snapshot.get("type", "door")),
 			float(found.get("offset_t", 0.5)),
@@ -1704,13 +1822,13 @@ func _clear_detached_opening_near(world_pos: Vector3) -> void:
 			node.queue_free()
 
 func _spawn_detached_opening(snapshot: Dictionary) -> void:
-	var scene_path := str(snapshot.get("scene_path", ""))
+	var scene_path = str(snapshot.get("scene_path", ""))
 	if scene_path == "":
 		return
 	var opening_scene: PackedScene = load(scene_path)
 	if opening_scene == null:
 		return
-	var scene := get_tree().current_scene
+	var scene = get_tree().current_scene
 	if not (scene is Node3D):
 		return
 	var inst: Node3D = opening_scene.instantiate()
@@ -1721,18 +1839,18 @@ func _spawn_detached_opening(snapshot: Dictionary) -> void:
 # Opening snapshot for move (stores tile coords for delta-based restore).
 func _snapshot_room_openings_for_move(base_tiles: Dictionary) -> Array[Dictionary]:
 	var snapshots: Array[Dictionary] = []
-	var opening_system := get_node_or_null("/root/OpeningSystem")
+	var opening_system = App.get_opening_service()
 	if opening_system == null:
 		return snapshots
 
-	var floor_index := FloorManager.current_floor
+	var floor_index = App.get_floor_service().current_floor
 	for wall_key in _boundary_wall_map(base_tiles, floor_index).keys():
 		if not bool(opening_system.call("has_opening", wall_key)):
 			continue
 		var opening = opening_system.call("get_opening", wall_key)
 		if opening == null:
 			continue
-		var wall_data = WallSystem.get_wall_by_key(wall_key)
+		var wall_data = App.get_wall_service().get_wall_by_key(wall_key)
 		if wall_data == null:
 			continue
 		snapshots.append({
@@ -1748,16 +1866,16 @@ func _snapshot_room_openings_for_move(base_tiles: Dictionary) -> Array[Dictionar
 func _restore_openings_with_delta(snapshots: Array[Dictionary], delta_tiles: Vector2i) -> void:
 	if snapshots.is_empty():
 		return
-	var opening_system := get_node_or_null("/root/OpeningSystem")
+	var opening_system = App.get_opening_service()
 	if opening_system == null:
 		return
 
 	for snapshot in snapshots:
-		var floor_index := int(snapshot.get("floor", FloorManager.current_floor))
+		var floor_index = int(snapshot.get("floor", App.get_floor_service().current_floor))
 		var from_tile: Vector2i = snapshot.get("from_tile", Vector2i.ZERO) + delta_tiles
 		var to_tile:   Vector2i = snapshot.get("to_tile",   Vector2i.ZERO) + delta_tiles
-		var wall_key := WallSystem.make_key(from_tile, to_tile, floor_index)
-		if not WallSystem.has_wall(from_tile, to_tile, floor_index):
+		var wall_key = App.get_wall_service().make_key(from_tile, to_tile, floor_index)
+		if not App.get_wall_service().has_wall(from_tile, to_tile, floor_index):
 			continue
 		if bool(opening_system.call("has_opening", wall_key)):
 			continue
@@ -1767,10 +1885,10 @@ func _restore_openings_with_delta(snapshots: Array[Dictionary], delta_tiles: Vec
 			str(snapshot.get("scene_path", "")))
 
 # ---------------------------------------------------------------------------
-# Plan validation & application (calls into WallSystem + UndoHistory)
+# Plan validation & application (calls into App.get_wall_service() + App.get_history_service())
 # ---------------------------------------------------------------------------
 func _can_apply_wall_delta(base_tiles: Dictionary, target_tiles: Dictionary, is_resize: bool) -> bool:
-	var plan := _build_adaptive_plan(base_tiles, target_tiles, is_resize)
+	var plan = _build_adaptive_plan(base_tiles, target_tiles, is_resize)
 	if not bool(plan.get("valid", false)):
 		return false
 
@@ -1778,8 +1896,8 @@ func _can_apply_wall_delta(base_tiles: Dictionary, target_tiles: Dictionary, is_
 	var moving_source_tiles: Dictionary = plan.get("selected_source_tiles", base_tiles)
 	var moving_ids_lookup: Dictionary = {}
 
-	if not is_resize and FurnitureSystem != null and FurnitureSystem.has_method("get_object_node_ids_in_tiles"):
-		moving_ids_lookup = _array_to_int_lookup(FurnitureSystem.call("get_object_node_ids_in_tiles", moving_source_tiles))
+	if not is_resize and App.get_furniture_service() != null and App.get_furniture_service().has_method("get_object_node_ids_in_tiles"):
+		moving_ids_lookup = _array_to_int_lookup(App.get_furniture_service().call("get_object_node_ids_in_tiles", moving_source_tiles))
 
 	if not _validate_plan_edges_with_moving(add_edges, is_resize, moving_ids_lookup):
 		return false
@@ -1788,14 +1906,14 @@ func _can_apply_wall_delta(base_tiles: Dictionary, target_tiles: Dictionary, is_
 	return true
 
 func _apply_tile_transform(base_tiles: Dictionary, target_tiles: Dictionary, label: String, is_resize: bool, move_delta_hint: Vector2i = Vector2i.ZERO) -> bool:
-	var plan := _build_adaptive_plan(base_tiles, target_tiles, is_resize)
+	var plan = _build_adaptive_plan(base_tiles, target_tiles, is_resize)
 	if not bool(plan.get("valid", false)):
 		return false
 
 	# Resolve move delta.
-	var move_delta := move_delta_hint
+	var move_delta = move_delta_hint
 	if not is_resize and move_delta == Vector2i.ZERO:
-		var inferred := _compute_uniform_translation(base_tiles, target_tiles)
+		var inferred = _compute_uniform_translation(base_tiles, target_tiles)
 		if not bool(inferred.get("valid", false)):
 			return false
 		move_delta = inferred["delta"]
@@ -1807,8 +1925,8 @@ func _apply_tile_transform(base_tiles: Dictionary, target_tiles: Dictionary, lab
 	# Furniture bookkeeping.
 	var moving_object_ids: Array[int]  = []
 	var moving_ids_lookup: Dictionary  = {}
-	if not is_resize and FurnitureSystem != null and FurnitureSystem.has_method("get_object_node_ids_in_tiles"):
-		moving_object_ids = FurnitureSystem.call("get_object_node_ids_in_tiles", moving_source_tiles)
+	if not is_resize and App.get_furniture_service() != null and App.get_furniture_service().has_method("get_object_node_ids_in_tiles"):
+		moving_object_ids = App.get_furniture_service().call("get_object_node_ids_in_tiles", moving_source_tiles)
 		moving_ids_lookup = _array_to_int_lookup(moving_object_ids)
 
 	if not _validate_plan_edges_with_moving(add_edges, is_resize, moving_ids_lookup):
@@ -1816,7 +1934,7 @@ func _apply_tile_transform(base_tiles: Dictionary, target_tiles: Dictionary, lab
 	if is_resize and not _validate_upper_floors_after_resize(plan):
 		return false
 
-	var floor_index           := FloorManager.current_floor
+	var floor_index           = App.get_floor_service().current_floor
 	var furniture_removals:    Array[Dictionary] = []
 	var opening_snapshots_move: Array[Dictionary] = []
 
@@ -1825,58 +1943,58 @@ func _apply_tile_transform(base_tiles: Dictionary, target_tiles: Dictionary, lab
 	else:
 		opening_snapshots_move = _snapshot_room_openings_for_move(moving_source_tiles)
 
-	var opening_snapshots := _snapshot_room_openings(base_tiles)
+	var opening_snapshots = _snapshot_room_openings(base_tiles)
 
 	if remove_edges.is_empty() and add_edges.is_empty() and furniture_removals.is_empty():
 		return false
 
 	# ----- Undo/redo registration -----
-	UndoHistory.execute(
+	App.get_history_service().execute(
 		label,
 		# DO:
 		func():
-			WallSystem.begin_batch()
+			App.get_wall_service().begin_batch()
 			for edge in remove_edges:
-				if WallSystem.has_wall(edge["from"], edge["to"], floor_index):
-					WallSystem.remove_wall(edge["from"], edge["to"], floor_index)
+				if App.get_wall_service().has_wall(edge["from"], edge["to"], floor_index):
+					App.get_wall_service().remove_wall(edge["from"], edge["to"], floor_index)
 
-			if not is_resize and FurnitureSystem != null and FurnitureSystem.has_method("translate_objects_by_node_ids"):
-				FurnitureSystem.call("translate_objects_by_node_ids", moving_object_ids, move_delta)
+			if not is_resize and App.get_furniture_service() != null and App.get_furniture_service().has_method("translate_objects_by_node_ids"):
+				App.get_furniture_service().call("translate_objects_by_node_ids", moving_object_ids, move_delta)
 
-			if is_resize and FurnitureSystem != null and FurnitureSystem.has_method("handle_invalid_snapshot"):
+			if is_resize and App.get_furniture_service() != null and App.get_furniture_service().has_method("handle_invalid_snapshot"):
 				for snapshot in furniture_removals:
-					FurnitureSystem.call("handle_invalid_snapshot", snapshot)
+					App.get_furniture_service().call("handle_invalid_snapshot", snapshot)
 
 			for edge in add_edges:
-				if not WallSystem.has_wall(edge["from"], edge["to"], floor_index):
-					WallSystem.place_wall(edge["from"], edge["to"], floor_index)
-			WallSystem.end_batch()
+				if not App.get_wall_service().has_wall(edge["from"], edge["to"], floor_index):
+					App.get_wall_service().place_wall(edge["from"], edge["to"], floor_index)
+			App.get_wall_service().end_batch()
 
 			if is_resize:
-				_restore_openings_from_snapshots(opening_snapshots)
+				_restore_openings_from_snapshots(opening_snapshots, target_tiles)
 			else:
 				_restore_openings_with_delta(opening_snapshots_move, move_delta),
 
 		# UNDO:
 		func():
-			WallSystem.begin_batch()
+			App.get_wall_service().begin_batch()
 			for edge in add_edges:
-				if WallSystem.has_wall(edge["from"], edge["to"], floor_index):
-					WallSystem.remove_wall(edge["from"], edge["to"], floor_index)
+				if App.get_wall_service().has_wall(edge["from"], edge["to"], floor_index):
+					App.get_wall_service().remove_wall(edge["from"], edge["to"], floor_index)
 			for edge in remove_edges:
-				if not WallSystem.has_wall(edge["from"], edge["to"], floor_index):
-					WallSystem.place_wall(edge["from"], edge["to"], floor_index)
-			WallSystem.end_batch()
+				if not App.get_wall_service().has_wall(edge["from"], edge["to"], floor_index):
+					App.get_wall_service().place_wall(edge["from"], edge["to"], floor_index)
+			App.get_wall_service().end_batch()
 
-			if not is_resize and FurnitureSystem != null and FurnitureSystem.has_method("translate_objects_by_node_ids"):
-				FurnitureSystem.call("translate_objects_by_node_ids", moving_object_ids, -move_delta)
+			if not is_resize and App.get_furniture_service() != null and App.get_furniture_service().has_method("translate_objects_by_node_ids"):
+				App.get_furniture_service().call("translate_objects_by_node_ids", moving_object_ids, -move_delta)
 
-			if is_resize and FurnitureSystem != null and FurnitureSystem.has_method("restore_snapshot"):
+			if is_resize and App.get_furniture_service() != null and App.get_furniture_service().has_method("restore_snapshot"):
 				for snapshot in furniture_removals:
-					FurnitureSystem.call("restore_snapshot", snapshot)
+					App.get_furniture_service().call("restore_snapshot", snapshot)
 
 			if is_resize:
-				_restore_openings_from_snapshots(opening_snapshots)
+				_restore_openings_from_snapshots(opening_snapshots, base_tiles)
 			else:
 				_restore_openings_with_delta(opening_snapshots_move, Vector2i.ZERO)
 	)
@@ -1887,11 +2005,11 @@ func _apply_tile_transform(base_tiles: Dictionary, target_tiles: Dictionary, lab
 # Tiny pure utilities
 # ---------------------------------------------------------------------------
 func _array_to_set(room_tiles: Array) -> Dictionary:
-	var set: Dictionary = {}
+	var tile_set: Dictionary = {}
 	for value in room_tiles:
 		if value is Vector2i:
-			set[value] = true
-	return set
+			tile_set[value] = true
+	return tile_set
 
 func _tiles_signature(tile_set: Dictionary) -> String:
 	var parts: Array[String] = []
@@ -1931,7 +2049,7 @@ func _setup_materials() -> void:
 	_handle_material.cull_mode        = BaseMaterial3D.CULL_DISABLED
 
 func _make_unshaded_material(color: Color) -> StandardMaterial3D:
-	var mat := StandardMaterial3D.new()
+	var mat = StandardMaterial3D.new()
 	mat.transparency  = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.shading_mode  = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.albedo_color  = color

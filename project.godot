@@ -16,13 +16,9 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-FurnitureSystem="*uid://b6t864yapyqq4"
-GridManager="*uid://o6i5sik6l3sd"
-WallSystem="*uid://dludbmcdoedw1"
-UndoHistory="*uid://4bni5qs06fm4"
-FloorManager="*uid://hlult5ghqf7e"
-OpeningSystem="*uid://bl5vya50r5oxh"
-RoomSystem="*uid://fiysapuhvtdn"
+SaveSystem="*res://autoload/SaveSystem.gd"
+App="*res://autoload/App.gd"
+GameDatabase="*res://autoload/GameDatabase.gd"
 
 [display]
 

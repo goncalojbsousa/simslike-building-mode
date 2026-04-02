@@ -12,7 +12,7 @@ func get_world_position_under_mouse() -> Vector3:
 
 	var ray_origin := camera.project_ray_origin(mouse_pos)
 	var ray_dir := camera.project_ray_normal(mouse_pos)
-	var floor_y := FloorManager.get_current_y_offset()
+	var floor_y : float = App.get_floor_service().get_current_y_offset()
 
 	# Intersect with the active build floor plane.
 	if abs(ray_dir.y) < 0.001:
@@ -24,7 +24,7 @@ func get_world_position_under_mouse() -> Vector3:
 
 	var hit := ray_origin + ray_dir * t
 	last_valid_world_pos = hit
-	last_valid_tile = GridManager.world_to_tile(hit)
+	last_valid_tile = App.get_grid_service().world_to_tile(hit)
 	return hit
 
 func get_tile_under_mouse() -> Vector2i:

@@ -1,3 +1,4 @@
+class_name OpeningService
 extends Node
 
 signal opening_added(wall_key: String)
@@ -33,7 +34,7 @@ func place_opening(
 		offset_t: float,
 		scene_path: String
 ) -> bool:
-	if not WallSystem.get_wall_by_key(wall_key):
+	if not App.get_wall_service().get_wall_by_key(wall_key):
 		return false   # no wall here
 	if _openings.has(wall_key):
 		return false   # already has an opening

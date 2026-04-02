@@ -1,3 +1,4 @@
+class_name FloorService
 extends Node
 
 const FLOOR_HEIGHT: float = 3.2   # world units between floors
@@ -32,7 +33,7 @@ func go_down() -> void:
 
 func _has_structure_on_floor(floor_index: int) -> bool:
 	# Check if any wall exists on this floor
-	for key in WallSystem.get_all_wall_keys():
-		if WallSystem.get_floor_from_key(key) == floor_index:
+	for key in App.get_wall_service().get_all_wall_keys():
+		if App.get_wall_service().get_floor_from_key(key) == floor_index:
 			return true
 	return false

@@ -69,14 +69,14 @@ func _paint_single_side(target: Dictionary) -> void:
 	if wall_key == "" or (side != "front" and side != "back"):
 		return
 
-	var old_color := WallSystem.get_wall_side_color_by_key(wall_key, side)
+	var old_color : Color = App.get_wall_service().get_wall_side_color_by_key(wall_key, side)
 	if old_color == current_color:
 		return
 
-	UndoHistory.execute(
+	App.get_history_service().execute(
 		"paint wall side",
-		func(): WallSystem.set_wall_side_color_by_key(wall_key, side, current_color),
-		func(): WallSystem.set_wall_side_color_by_key(wall_key, side, old_color)
+		func(): App.get_wall_service().set_wall_side_color_by_key(wall_key, side, current_color),
+		func(): App.get_wall_service().set_wall_side_color_by_key(wall_key, side, old_color)
 	)
 
 func _paint_multiple_sides(targets: Array[Dictionary], label: String) -> void:
@@ -87,22 +87,22 @@ func _paint_multiple_sides(targets: Array[Dictionary], label: String) -> void:
 		snapshot.append({
 			"wall_key": key,
 			"side": side,
-			"old_color": WallSystem.get_wall_side_color_by_key(key, side),
+			"old_color": App.get_wall_service().get_wall_side_color_by_key(key, side),
 		})
 
-	UndoHistory.execute(
+	App.get_history_service().execute(
 		label,
 		func():
 			for target in targets:
 				var key := str(target.get("wall_key", ""))
 				var side := str(target.get("side", ""))
-				WallSystem.set_wall_side_color_by_key(key, side, current_color),
+				App.get_wall_service().set_wall_side_color_by_key(key, side, current_color),
 		func():
 			for saved in snapshot:
 				var key := str(saved.get("wall_key", ""))
 				var side := str(saved.get("side", ""))
-				var old_color: Color = saved.get("old_color", WallSystem.get_default_wall_color())
-				WallSystem.set_wall_side_color_by_key(key, side, old_color)
+				var old_color: Color = saved.get("old_color", App.get_wall_service().get_default_wall_color())
+				App.get_wall_service().set_wall_side_color_by_key(key, side, old_color)
 	)
 
 func _collect_targets_from_pick(picked: Dictionary, shift_pressed: bool) -> Array[Dictionary]:
@@ -114,10 +114,10 @@ func _collect_targets_from_pick(picked: Dictionary, shift_pressed: bool) -> Arra
 		})
 		return _dedupe_targets(targets)
 
-	var floor_index := FloorManager.current_floor
+	var floor_index : int = App.get_floor_service().current_floor
 	var target_room_id := int(picked.get("room_id", -1))
 
-	for identity in WallSystem.get_wall_identities_for_floor(floor_index):
+	for identity in App.get_wall_service().get_wall_identities_for_floor(floor_index):
 		var identity_dict := identity as Dictionary
 		var key := str(identity_dict.get("key", ""))
 		if key == "":
@@ -192,7 +192,7 @@ func _pick_wall_surface_with_physics() -> Dictionary:
 	if wall_key == "" or (side != "front" and side != "back"):
 		return {}
 
-	var identity := WallSystem.get_wall_identity_by_key(wall_key)
+	var identity : Dictionary = App.get_wall_service().get_wall_identity_by_key(wall_key)
 	if identity.is_empty():
 		return {}
 	var side_info: Dictionary = identity.get("%s_side" % side, {})
@@ -204,8 +204,8 @@ func _pick_wall_surface_with_physics() -> Dictionary:
 
 func _pick_wall_surface_with_grid() -> Dictionary:
 	var world: Vector3 = mouse_raycast.get_world_position_under_mouse()
-	var floor_index := FloorManager.current_floor
-	var tile_size: float = GridManager.TILE_SIZE
+	var floor_index : int = App.get_floor_service().current_floor
+	var tile_size: float = App.get_grid_service().TILE_SIZE
 
 	var lx := world.x / tile_size
 	var lz := world.z / tile_size
@@ -238,10 +238,10 @@ func _pick_wall_surface_with_grid() -> Dictionary:
 		if distance > PICK_MAX_DISTANCE:
 			continue
 		var wall_key := _make_wall_key(a, b, floor_index)
-		if WallSystem.get_wall_by_key(wall_key) == null:
+		if App.get_wall_service().get_wall_by_key(wall_key) == null:
 			continue
 
-		var identity := WallSystem.get_wall_identity_by_key(wall_key)
+		var identity : Dictionary = App.get_wall_service().get_wall_identity_by_key(wall_key)
 		if identity.is_empty():
 			continue
 		var side := _resolve_clicked_side(identity, world)
@@ -293,22 +293,22 @@ func _create_preview_for_target(target: Dictionary) -> MeshInstance3D:
 	if wall_key == "" or (side != "front" and side != "back"):
 		return null
 
-	var wall_data = WallSystem.get_wall_by_key(wall_key)
+	var wall_data = App.get_wall_service().get_wall_by_key(wall_key)
 	if wall_data == null:
 		return null
 
 	var from_tile: Vector2i = wall_data.from_tile
 	var to_tile: Vector2i = wall_data.to_tile
-	var floor_index := int(WallSystem.get_floor_from_key(wall_key))
-	var floor_y := GridManager.get_wall_y_base(floor_index)
-	var height := FloorManager.FLOOR_HEIGHT
+	var floor_index := int(App.get_wall_service().get_floor_from_key(wall_key))
+	var floor_y : int = App.get_grid_service().get_wall_y_base(floor_index)
+	var height : int = App.get_floor_service().FLOOR_HEIGHT
 
-	var from_world := GridManager.tile_to_world(from_tile)
-	var to_world := GridManager.tile_to_world(to_tile)
-	var midpoint := (from_world + to_world) * 0.5
+	var from_world : Vector3 = App.get_grid_service().tile_to_world(from_tile)
+	var to_world : Vector3 = App.get_grid_service().tile_to_world(to_tile)
+	var midpoint : Vector3 = (from_world + to_world) * 0.5
 	var diff := to_tile - from_tile
 	var is_parallel_z := diff.x != 0
-	var length := GridManager.TILE_SIZE
+	var length : float = App.get_grid_service().TILE_SIZE
 
 	var preview := MeshInstance3D.new()
 	var box := BoxMesh.new()
@@ -375,7 +375,7 @@ func _resolve_clicked_side(identity: Dictionary, world: Vector3) -> String:
 	var orientation := str(identity.get("orientation", ""))
 	var from_tile: Vector2i = identity.get("from_tile", Vector2i.ZERO)
 	var to_tile: Vector2i = identity.get("to_tile", Vector2i.ZERO)
-	var tile_size: float = GridManager.TILE_SIZE
+	var tile_size: float = App.get_grid_service().TILE_SIZE
 
 	if orientation == "vertical":
 		var min_x := mini(from_tile.x, to_tile.x)

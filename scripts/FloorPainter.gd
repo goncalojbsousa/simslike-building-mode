@@ -44,7 +44,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _paint_tile() -> void:
 	var tile  : Vector2i = mouse_raycast.get_tile_under_mouse()
-	var floor_index := FloorManager.current_floor
+	var floor_index : int = App.get_floor_service().current_floor
 	var mat   := current_material
 	var target_tiles := _collect_target_tiles(tile, floor_index, Input.is_key_pressed(KEY_SHIFT))
 	if target_tiles.is_empty():
@@ -52,35 +52,35 @@ func _paint_tile() -> void:
 
 	var snapshot: Dictionary = {}
 	for tile_key in target_tiles.keys():
-		snapshot[tile_key] = RoomSystem.get_tile_material(tile_key, floor_index)
+		snapshot[tile_key] = App.get_room_service().get_tile_material(tile_key, floor_index)
 
 	var label := "paint floor tile"
 	if target_tiles.size() > 1:
 		label = "paint room floor"
 
-	UndoHistory.execute(
+	App.get_history_service().execute(
 		label,
 		func():
 			var next_materials: Dictionary = {}
 			for tile_key in target_tiles.keys():
 				next_materials[tile_key] = mat
-			RoomSystem.set_tile_materials_bulk(next_materials, floor_index),
+			App.get_room_service().set_tile_materials_bulk(next_materials, floor_index),
 		func():
-			RoomSystem.set_tile_materials_bulk(snapshot, floor_index)
+			App.get_room_service().set_tile_materials_bulk(snapshot, floor_index)
 	)
 
 func _collect_target_tiles(origin_tile: Vector2i, floor_index: int, shift_pressed: bool) -> Dictionary:
 	if not shift_pressed:
 		return {origin_tile: true}
 
-	var room_id := WallSystem.get_room_id_for_tile(origin_tile, floor_index)
+	var room_id : int = App.get_wall_service().get_room_id_for_tile(origin_tile, floor_index)
 	if room_id != -1:
-		return WallSystem.get_room_tiles_by_id(room_id, floor_index)
+		return App.get_wall_service().get_room_tiles_by_id(room_id, floor_index)
 
-	return RoomSystem.get_all_floor_tiles(floor_index)
+	return App.get_room_service().get_all_floor_tiles(floor_index)
 
 func _update_hover_preview() -> void:
-	var floor_index := FloorManager.current_floor
+	var floor_index : int = App.get_floor_service().current_floor
 	var tile: Vector2i = mouse_raycast.get_tile_under_mouse()
 	var target_tiles := _collect_target_tiles(tile, floor_index, Input.is_key_pressed(KEY_SHIFT))
 	if target_tiles.is_empty():
@@ -113,8 +113,8 @@ func _rebuild_preview_mesh(tiles: Dictionary, floor_index: int) -> void:
 	if _preview_mesh == null:
 		return
 
-	var y := FloorManager.get_floor_y_offset(floor_index) + preview_y_offset
-	var ts := GridManager.TILE_SIZE
+	var y : float = App.get_floor_service().get_floor_y_offset(floor_index) + preview_y_offset
+	var ts : float = App.get_grid_service().TILE_SIZE
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 

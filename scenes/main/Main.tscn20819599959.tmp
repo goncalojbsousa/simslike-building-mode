@@ -53,6 +53,15 @@ camera = NodePath("../CameraRig/PitchArm/Camera3D")
 [node name="WallPlacer" type="Node" parent="." unique_id=1919074811 node_paths=PackedStringArray("mouse_raycast")]
 script = ExtResource("4_dc040")
 mouse_raycast = NodePath("../MouseRaycast")
+active = null
+wall_preview_material = null
+wall_delete_material = null
+preview_height = null
+preview_thickness = null
+start_pointer_material = null
+pointer_radius = null
+pointer_height = null
+pointer_y_offset = null
 
 [node name="FurniturePlacer" type="Node" parent="." unique_id=156165863 node_paths=PackedStringArray("mouse_raycast")]
 script = ExtResource("6_sjxhf")

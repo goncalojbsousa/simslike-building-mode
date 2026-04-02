@@ -1,3 +1,4 @@
+class_name WallService
 extends Node
 
 # --- Storage ---
@@ -38,8 +39,32 @@ func _ready() -> void:
 	_room_detector = ROOM_DETECTOR_SCRIPT.new()
 	add_child(_room_detector)
 
+func _app() -> Node:
+	return get_node_or_null("/root/App")
+
+func _floor_service() -> Node:
+	var app = _app()
+	if app == null:
+		return null
+	return app.call("get_floor_service")
+
+func _furniture_service() -> Node:
+	var app = _app()
+	if app == null:
+		return null
+	return app.call("get_furniture_service")
+
+func _current_floor() -> int:
+	var floor_service = _floor_service()
+	if floor_service == null:
+		return 0
+	return int(floor_service.current_floor)
+
 func _opening_system() -> Node:
-	return get_node_or_null("/root/OpeningSystem")
+	var app = _app()
+	if app == null:
+		return null
+	return app.call("get_opening_service")
 
 func _begin_room_batch() -> void:
 	_room_batch_depth += 1
@@ -76,7 +101,7 @@ func _run_room_detection_if_dirty() -> void:
 # -------------------------------------------------------
 
 func make_key(a: Vector2i, b: Vector2i, floor_index: int = -1) -> String:
-	var f := floor_index if floor_index >= 0 else FloorManager.current_floor
+	var f: int = floor_index if floor_index >= 0 else _current_floor()
 	if a.x < b.x or (a.x == b.x and a.y < b.y):
 		if f == 0:
 			return "%d,%d|%d,%d" % [a.x, a.y, b.x, b.y]
@@ -114,7 +139,7 @@ func get_wall_keys_for_floor(floor_index: int) -> Array[String]:
 # -------------------------------------------------------
 
 func has_wall(a: Vector2i, b: Vector2i, floor_index: int = -1) -> bool:
-	var f := floor_index if floor_index >= 0 else FloorManager.current_floor
+	var f: int = floor_index if floor_index >= 0 else _current_floor()
 	return _walls.has(make_key(a, b, f))
 
 func get_wall(a: Vector2i, b: Vector2i, floor_index: int = -1) -> WallData:
@@ -131,7 +156,7 @@ func get_all_walls() -> Array:
 # -------------------------------------------------------
 
 func get_walls_of_tile(tile: Vector2i, floor_index: int = -1) -> Array[String]:
-	var f := floor_index if floor_index >= 0 else FloorManager.current_floor
+	var f: int = floor_index if floor_index >= 0 else _current_floor()
 	var keys: Array[String] = []
 	var neighbors := [
 		Vector2i(tile.x + 1, tile.y),
@@ -150,7 +175,7 @@ func get_walls_of_tile(tile: Vector2i, floor_index: int = -1) -> Array[String]:
 # -------------------------------------------------------
 
 func can_place_wall(a: Vector2i, b: Vector2i, floor_index: int = -1) -> bool:
-	var f := floor_index if floor_index >= 0 else FloorManager.current_floor
+	var f: int = floor_index if floor_index >= 0 else _current_floor()
 	var diff := b - a
 	if abs(diff.x) + abs(diff.y) != 1:
 		return false
@@ -159,8 +184,9 @@ func can_place_wall(a: Vector2i, b: Vector2i, floor_index: int = -1) -> bool:
 	# Upper floors can overhang the floor below by a limited number of cells.
 	if f > 0 and not _has_upper_floor_support(a, b, f):
 		return false
-	if FurnitureSystem != null and FurnitureSystem.has_method("has_furniture_blocking_wall"):
-		if FurnitureSystem.has_furniture_blocking_wall(a, b):
+	var furniture_service = _furniture_service()
+	if furniture_service != null and furniture_service.has_method("has_furniture_blocking_wall"):
+		if furniture_service.has_furniture_blocking_wall(a, b, f):
 			return false
 	return true
 
@@ -224,7 +250,7 @@ func _get_floor_bounds(floor_index: int) -> Dictionary:
 	}
 
 func place_wall(a: Vector2i, b: Vector2i, floor_index: int = -1) -> bool:
-	var f := floor_index if floor_index >= 0 else FloorManager.current_floor
+	var f: int = floor_index if floor_index >= 0 else _current_floor()
 	if not can_place_wall(a, b, f):
 		return false
 	var key := make_key(a, b, f)
@@ -235,7 +261,7 @@ func place_wall(a: Vector2i, b: Vector2i, floor_index: int = -1) -> bool:
 	return true
 
 func remove_wall(a: Vector2i, b: Vector2i, floor_index: int = -1) -> bool:
-	var f := floor_index if floor_index >= 0 else FloorManager.current_floor
+	var f: int = floor_index if floor_index >= 0 else _current_floor()
 	var key := make_key(a, b, f)
 	if not _walls.has(key):
 		return false
@@ -412,14 +438,14 @@ func get_room_entries_for_floor(floor_index: int) -> Array:
 	return _room_entries_by_floor.get(floor_index, [])
 
 func get_room_id_for_tile(tile: Vector2i, floor_index: int = -1) -> int:
-	var f := floor_index if floor_index >= 0 else FloorManager.current_floor
+	var f: int = floor_index if floor_index >= 0 else _current_floor()
 	var entry := _get_room_entry_for_tile(tile, f)
 	if entry.is_empty():
 		return -1
 	return int(entry.get("id", -1))
 
 func get_room_tiles_by_id(room_id: int, floor_index: int = -1) -> Dictionary:
-	var f := floor_index if floor_index >= 0 else FloorManager.current_floor
+	var f: int = floor_index if floor_index >= 0 else _current_floor()
 	for entry in get_room_entries_for_floor(f):
 		var room_entry := entry as Dictionary
 		if int(room_entry.get("id", -1)) != room_id:
