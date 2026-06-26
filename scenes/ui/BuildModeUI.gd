@@ -42,7 +42,10 @@ func _ready() -> void:
 	refresh_slot_picker()
 	if App.get_floor_service() != null:
 		_refresh_floor_label(App.get_floor_service().current_floor)
-	if App.get_history_service() != null:
+	var ctx: Variant = App.get_build_context()
+	if ctx != null and ctx.has_method("can_undo") and ctx.has_method("can_redo"):
+		_refresh_undo_redo_buttons(bool(ctx.call("can_undo")), bool(ctx.call("can_redo")))
+	elif App.get_history_service() != null:
 		_refresh_undo_redo_buttons(App.get_history_service().can_undo(), App.get_history_service().can_redo())
 
 func initialize_selection() -> void:
@@ -122,13 +125,13 @@ func set_selection_context(selection_type: String) -> void:
 	if _selection_context == "none":
 		return
 	if _selection_context == "room":
-		item_detail_label.text = "Room selected. Move/resize directly or use room actions."
+		item_detail_label.text = "Room selected. Drag to move, use arrows to resize, press Delete to remove."
 		return
 	if _selection_context == "wall":
-		item_detail_label.text = "Wall selected. Drag to move wall or use structure actions."
+		item_detail_label.text = "Wall selected. Drag to move wall."
 		return
 	if _selection_context == "furniture":
-		item_detail_label.text = "Furniture selected. Move with click and rotate with R."
+		item_detail_label.text = "Furniture selected. Click to move, press R to rotate, Delete to remove."
 
 func select_context_item(category_id: String, item_id: String, emit_mode: bool = true) -> bool:
 	var category := _find_category(category_id)
@@ -276,7 +279,7 @@ func _build_unselected_default_payload(_category_id: String) -> Dictionary:
 
 func _set_unselected_default_hint(category_id: String) -> void:
 	if category_id == "structure" or category_id == "furniture":
-		item_detail_label.text = "Default mode: Select and move. Pick a tool only when needed."
+		item_detail_label.text = "Default mode: Click objects to select/move. Use tools only when needed."
 		return
 
 	var category := _find_category(category_id)

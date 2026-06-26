@@ -16,12 +16,12 @@ func _action_succeeded(result: Variant) -> bool:
 
 func execute(label: String, do_action: Callable, undo_action: Callable) -> void:
 	if not do_action.is_valid() or not undo_action.is_valid():
-		push_error("App.get_history_service(): invalid action callable for '%s'." % label)
+		push_error("BuildHistoryService: invalid action callable for '%s'." % label)
 		return
 
 	var result: Variant = do_action.call()
 	if not _action_succeeded(result):
-		push_warning("App.get_history_service(): action '%s' reported failure and was not recorded." % label)
+		push_warning("BuildHistoryService: action '%s' reported failure and was not recorded." % label)
 		return
 
 	_history.append({"do": do_action, "undo": undo_action, "label": label})
@@ -35,14 +35,14 @@ func undo() -> void:
 		return
 	var entry: Dictionary = _history.pop_back()
 	if not entry.has("undo") or not (entry["undo"] is Callable):
-		push_error("App.get_history_service(): undo entry is missing a valid callable.")
+		push_error("BuildHistoryService: undo entry is missing a valid callable.")
 		_history.append(entry)
 		return
 
 	var undo_action: Callable = entry["undo"]
 	var result: Variant = undo_action.call()
 	if not _action_succeeded(result):
-		push_warning("App.get_history_service(): undo action failed and was reverted to history.")
+		push_warning("BuildHistoryService: undo action failed and was reverted to history.")
 		_history.append(entry)
 		return
 
@@ -54,14 +54,14 @@ func redo() -> void:
 		return
 	var entry: Dictionary = _redo_stack.pop_back()
 	if not entry.has("do") or not (entry["do"] is Callable):
-		push_error("App.get_history_service(): redo entry is missing a valid callable.")
+		push_error("BuildHistoryService: redo entry is missing a valid callable.")
 		_redo_stack.append(entry)
 		return
 
 	var do_action: Callable = entry["do"]
 	var result: Variant = do_action.call()
 	if not _action_succeeded(result):
-		push_warning("App.get_history_service(): redo action failed and remains in redo stack.")
+		push_warning("BuildHistoryService: redo action failed and remains in redo stack.")
 		_redo_stack.append(entry)
 		return
 

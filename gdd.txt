@@ -1,0 +1,457 @@
+O jogador assume o papel de fundador de um estúdio de desenvolvimento de videojogos. Começa sozinho, com recursos limitados, e deve fazer crescer a empresa através da criação e lançamento de jogos, contratação de funcionários, desenvolvimento de engines próprias e conquista de reputação no mercado.
+
+Ao contrário de um CEO distante, o fundador é também um desenvolvedor ativo, com skills próprias que evoluem ao longo do jogo (0–100 por área), contribuindo diretamente para os projetos.
+
+1.1 Proposta de Valor
+•	Gestão de estúdio com profundidade de simulação real
+•	O jogador sente o crescimento — de garage dev a grande estúdio
+•	Decisões de negócio com consequências a longo prazo
+•	Sistema de avaliação de qualidade baseado em dados e fórmulas transparentes
+
+2.1 O Fundador (Jogador)
+O fundador é um funcionário especial — não pode ser despedido, tem skills próprias e pode ser alocado a qualquer equipa ou projeto.
+
+Atributo	Descrição
+Design	Influência na qualidade criativa e escolhas de género/tema
+Programming	Contribui para desenvolvimento de engine e funções técnicas
+Art	Qualidade visual dos jogos produzidos
+Marketing	Impacto nas vendas e alcance pós-lançamento
+Support	Resposta a bugs e satisfação pós-venda
+
+As skills evoluem com a prática: participar em projetos, completar tarefas e eventos aumentam os valores de 0 a 100.
+
+
+2.2 Funcionários
+Cada funcionário é um agente com identidade própria e é gerido através do EmployeeState + EmployeeService.
+
+Campo	Tipo	Descrição
+nome	String	Nome do funcionário
+género	Enum	Representação visual/narrativa
+salário	Float	Custo mensal fixo
+design	Int 0–100	Skill de design
+programming	Int 0–100	Skill de programação
+art	Int 0–100	Skill de arte
+marketing	Int 0–100	Skill de marketing
+support	Int 0–100	Skill de suporte
+team_id	String	Equipa atual
+
+
+2.3 Equipas (Teams)
+Uma equipa é um grupo de funcionários com uma tarefa atribuída. Cada projeto de jogo ou engine é gerido por uma ou mais equipas.
+
+Campo	Descrição
+nome	Identificador da equipa
+funcionários	Lista de IDs de empregados (inclui fundador se alocado)
+tarefa	Projeto atribuído (jogo, engine, investigação)
+
+
+3.2 Pipeline de Desenvolvimento
+O desenvolvimento segue fases sequenciais. Cada fase tem métricas próprias que são avaliadas no cálculo final do score.
+
+Fase	Descrição	Serviço Godot
+Pré-Produção (Stage 1)	Conceito, design doc, planeamento	GameDevelopmentService
+Produção (Stage 2)	Programação, arte, implementação	GameDevelopmentService
+QA (Stage 3)	Testes, correção de bugs, polish	GameDevelopmentService
+Lançamento	Distribuição, marketing, vendas	EconomyService
+
+3.3 Sistema de Score (ScoreCalculator)
+O score final de um jogo é calculado por stage com base na proximidade entre os valores produzidos pela equipa e os ideais do género selecionado. Este sistema já está implementado em ScoreCalculator.gd.
+
+Fórmula de Penalidade por Stage
+•	diff ≤ 10: penalidade linear — máximo 30%
+•	diff > 10: penalidade acelerada exponencial (cap: 100%)
+•	Proximity = clamp(1.0 - penalty, 0.0, 1.0)
+•	Score stage = média de proximity de todas as métricas × 100
+
+Variação de Ideais
+Os ideais por métrica e stage têm um offset aleatório gerado no início do projeto (IDEAL_VARIATION_RANGE definido em GameConfig). Isto garante que cada jogo é único mesmo com o mesmo género.
+
+Fatores de Qualidade
+•	Combinação Género + Tema: define os ideais de score por stage
+•	Skills da Equipa: determinam os valores produzidos em cada métrica
+•	Qualidade da Engine: modificador global sobre o score final
+
+
+
+Um jogo possui os seguintes dados (São preenchidos no menu de criação de jogo):
+Nome - O nome do jogo
+IP - Campo opcional, uma ip representa que este jogo é sequencia de uma franquia
+Genre - Genero do jogo
+Theme - Tema do jogo
+Game size - Tamanho do jogo (Indie, Medium, Big, AAA)
+Publico alvo - O publico alvo do jogo (Teen, everyone, mature)
+Engine - Campo opcional, Engine usada para desenvolver o jogo.
+Team - Equipa(s) que desenvolvem o jogo.
+Plataforma(s) - Plataforma(s) onde o jogo vai ser lançado.
+Language - Idiomas em que o jogo vai ser lançado.
+
+
+O Genre possui o campo popularidade. A populariade de um genero afeta possitivamente ou negativamente as vendas do jogo. Este valor é dinamico e vai alterando ao longo do jogo. O genero tem relacao direta com o Theme. Escolher uma boa relacao de genro e Theme melhora a nota e vendas. Uma ma relacao piora a nota e vendas.
+
+
+Game size afeta a notas e as vendas do jogo, um jogo indie possui maior dificuldade em conseguir notas mais altas e vende menos. quanto que um jogo AAA tem mais facilidade em ter notas altas e vender bem.
+
+Publico alvo tem relaçao direta com o genero. Escolher uma boa relacao de genro e publico alvo melhora a nota e vendas. Uma ma relacao piora a nota e vendas.
+
+
+
+Uma engine possui os seguintes dados:
+Nome - Nome da engine
+Policy - Estrategia de venda da engine (Open source, Internal, licensed)
+Share - Campo apenas para se for licensed, representa o corte que quem deselvolve o jogo tem de pagar para a dona da engine.
+Features - A engine pode possuir varias features, escolhiodas pelo player. Durante o desenvolvimento do jogo, estas features so podem ser incluidas se estiver a ser usada uma engina que as desbloqueia. Cada features tem um custo de CPU e GPU. As plataformas possuem um nivel de CPU e GPU tambem, então as features que podem ser usadas estão limitadas a quantidade de processamento da plataforma. A quantidade de 
+
+
+Teams: Teams são compostas por funcionários.
+
+Os Employees possuem: 
+Nome - Nome do funcionário
+Idade - Idade do funcionário
+Team - Team a que esta associado, pode não estar em nenhuma
+Design - Habilidade de 0 a 100
+Programing- Habilidade de 0 a 100
+Art - Habilidade de 0 a 100
+Marketing - Habilidade de 0 a 100
+Support - Habilidade de 0 a 100
+Salary - Salario do funcionario
+
+Platforms:
+As platforms possuem nome, data de lançamento, market share, CPU, GPU e licence (preço para lançar nela). O market share quanto maior mais vende o jogo.
+
+LanguageS: Possuem o nome, reach, dev cost e complexitiy. O dev cust é o quanto aumenta o custo de desenvolvimento, o complexitiy é o quanto aumenta o tempo de desenvolvimento.
+
+
+
+Contratação de funcionários:
+O jogadores escolhe a main role e secundary role, o salary espectavel (low, medium, hight) e o type. obtem candidaturas de acordo com a combinação.
+
+
+
+Eventos:
+Game of The Year (GOTY): Anualmente um jogo é escolhido como jogo do ano. O jogo escolhido como jogo do ano recebe um grande aumento de vendas.
+Summer Sale: Em junho, os jogos que colocarem uma promoção recebem um aumento de vendas.
+
+
+
+
+4.1 Ciclo de Receita
+A principal fonte de receita é a venda de jogos lançados. Não há subscrições nem contratos de publisher (exceto como evento especial via reputação).
+
+Fator	Impacto nas Vendas
+Score do Jogo	Fator principal: score alto = mais vendas
+Reputação do Estúdio	Multiplicador: mais reputação = mais confiança dos consumidores
+Tendências de Mercado	Géneros e temas em alta vendem mais
+Classificação Etária	Filtra o mercado potencial por segmento
+Tamanho do Jogo	Indie tem custos baixos; AAA tem potencial de receita alto mas risco elevado
+
+
+4.2 Reputação e Fãs
+•	Cada jogo lançado gera ou destrói reputação consoante o score
+•	Fãs acumulam-se com jogos bem avaliados e criam uma base de consumidores fiel
+•	Alta reputação desbloqueia contratos especiais e cobertura de imprensa
+
+
+4.3 Despesas
+•	Salários mensais de todos os funcionários (incluindo fundador — custo de vida)
+•	Custos de produção escalam com o tamanho do jogo
+•	Investigação de features de engine tem custo e tempo
+
+
+
+5.1 Estrutura da Engine
+Campo	Descrição
+nome	Nome da engine (definido pelo jogador)
+versão	v1, v2, v3... cada versão é um salto de capacidade
+policy	Open Source / Internal / Comercial
+equipa	Equipa alocada ao desenvolvimento/manutenção
+features	Lista de funcionalidades desbloqueadas
+
+5.3 Política da Engine
+Policy	Efeito
+Open Source	Aumenta reputação, outros estúdios podem usá-la (sem receita direta)
+Internal	Uso exclusivo do estúdio, sem licenciamento
+Comercial	Outros estúdios pagam licença — fonte de receita passiva
+
+
+
+6. Sistema de Tempo
+
+O tempo é simulado em semanas. O TimeService emite ticks semanais que propagam atualizações para todos os sistemas.
+
+Unidade	Correspondência
+1 Tick	1 Semana de jogo
+4 Ticks	1 Mês
+48 Ticks	1 Ano (12 meses × 4 semanas)
+
+Eventos Sazonais
+•	Cada mês podem surgir eventos de mercado (tendências, crises)
+•	Pagamentos de salário ocorrem mensalmente (cada 4 ticks)
+•	Projetos têm duração em semanas por fase
+
+
+
+
+7.1 Tipos de Eventos
+Evento	Gatilho	Impacto
+Funcionário pede aumento	Tempo na empresa + salário abaixo do mercado	Aceitar (custo) ou recusar (risco de saída)
+Funcionário sai	Insatisfação acumulada	Perda de skill e continuidade de projeto
+Tendência de mercado	Aleatório / ciclo temporal	Género/tema em alta por N semanas
+Crise de mercado	Aleatório / reputação baixa	Redução de vendas globais
+Bugs críticos	Score QA baixo + jogo lançado	Dano de reputação, custo de patch
+
+7.2 Resolução de Eventos
+•	Eventos críticos pausam o tempo e exigem decisão do jogador
+•	Eventos menores são notificados mas não bloqueantes
+•	Algumas decisões têm consequências diferidas (ex: não dar aumento → saída em 4 semanas)
+
+
+
+
+8. Arquitetura Técnica (Godot 4)
+
+O projeto segue uma arquitetura estrita de separação de responsabilidades. Nenhuma lógica de gameplay pode residir na UI.
+
+8.1 Mapeamento de Sistemas
+Sistema de Jogo	Camada	Localização Godot
+Dados estáticos (géneros, temas, features)	data/	data/genres/, data/themes/, data/engine_features/
+Estado de empresa, mercado	state/	state/CompanyState.gd, MarketState.gd
+Estado de funcionário	game/	game/EmployeeState.gd
+Estado de projeto de jogo	game/	game/GameProject.gd
+Estado de engine	game/engine/	game/engine/GameEngine.gd, EngineVersion.gd
+Tempo e ticks	services/	services/TimeService.gd
+Economia e vendas	services/	services/EconomyService.gd
+Desenvolvimento de jogos	services/	services/GameDevelopmentService.gd
+Gestão de engine	services/	services/EngineService.gd
+Score e avaliação	services/	services/ScoreEvaluator.gd (usa ScoreCalculator)
+Eventos e imprevistos	services/	services/EventService.gd
+Funcionários e equipas	services/	services/EmployeeService.gd, TeamService.gd
+Sessão de jogo	session/	session/GameSession.gd
+Base de dados global	autoload/	autoload/GameDatabase.gd
+
+8.2 Fluxo de Dados
+•	UI lê estado via GameSession e chama APIs dos Services
+•	Services atualizam State e emitem sinais
+•	TimeService é o único driver de simulação (1 tick = 1 semana)
+•	GameDatabase fornece os Resources estáticos (géneros, temas, engine features)
+•	ScoreCalculator é chamado pelo ScoreEvaluator no fim de cada fase
+
+8.3 Regras de Arquitetura
+•	Nunca colocar lógica de gameplay na UI
+•	Evitar Autoloads com dependências de gameplay
+•	Services vivem dentro de GameSession (não são Autoloads)
+•	Conteúdo editável → Resources em data/
+•	Dicionários apenas para caches e lookup tables — nunca para estado core
+
+
+9. Modelo Matemático (Fórmulas Operacionais)
+
+Nota: esta secção define o contrato numérico do design. Partes podem ainda não estar implementadas, mas servem como referência única para implementação e balanceamento.
+
+9.1 Convenções e Normalização
+•	Clamp padrão: clamp(x, min, max)
+•	Normalização de skill (0-100): skill_n = skill / 100.0
+•	Diferença absoluta: diff = abs(valor_produzido - valor_ideal)
+•	Média simples: mean(v1..vn) = (soma vi) / n
+•	Média ponderada: wmean(v, w) = (soma (vi * wi)) / (soma wi)
+
+
+9.2 Fórmulas de Produção por Equipa
+Para cada stage s e métrica m:
+•	team_skill(m) = wmean(skill_funcionario_relacionada_a_m, peso_funcionario)
+•	peso_funcionario = 1.0 para funcionário normal; fundador pode usar 1.15 (bónus de fundador)
+•	effort(s,m) = clamp(team_skill(m) + b_engine(s,m) + b_tooling(s,m) + ruido, 0, 100)
+•	ruido = randf_range(-RUIDO_STAGE, +RUIDO_STAGE)
+
+Mapeamento recomendado de skills para métricas:
+•	Pré-produção: design (forte), programming (médio)
+•	Produção: programming (forte), art (forte), design (médio)
+•	QA: support (forte), programming (médio)
+
+
+9.3 Fórmulas de Score (ScoreCalculator)
+9.3.1 Variação dos Ideais
+•	ideal_var = ideal_base + randf_range(-IDEAL_VARIATION_RANGE, +IDEAL_VARIATION_RANGE)
+•	ideal_var = clamp(ideal_var, 0, 100)
+
+9.3.2 Penalidade por métrica
+Se diff <= 10 (zona linear):
+•	penalty = 0.03 * diff
+
+Se diff > 10 (zona exponencial acelerada):
+•	penalty = min(1.0, 0.30 + 0.70 * (1.0 - exp(-K_EXP * (diff - 10))))
+•	K_EXP recomendado: 0.08
+
+9.3.3 Proximidade e score de stage
+•	proximity = clamp(1.0 - penalty, 0.0, 1.0)
+•	score_stage = mean(proximity_metricas_stage) * 100
+
+9.3.4 Score final do jogo
+•	score_base = wmean([score_pre, score_prod, score_qa], [0.25, 0.50, 0.25])
+•	engine_mult = lerp(0.85, 1.15, engine_quality / 100.0)
+•	fit_genre_theme_mult = valor em [0.85, 1.15]
+•	fit_genre_target_mult = valor em [0.90, 1.10]
+•	size_quality_mult: Indie=0.92, Medium=1.00, Big=1.05, AAA=1.10
+•	score_final = clamp(score_base * engine_mult * fit_genre_theme_mult * fit_genre_target_mult * size_quality_mult, 0, 100)
+
+
+9.4 Fórmulas de Vendas e Receita (EconomyService)
+9.4.1 Multiplicadores principais
+•	score_mult = 0.25 + 1.75 * pow(score_final / 100.0, 2)
+•	reputation_mult = 0.70 + 0.80 * (reputation / 100.0)
+•	genre_popularity_mult = 1.0 + genre_popularity
+•	market_trend_mult = 1.0 + trend_genre + trend_theme
+•	market_trend_mult clamp em [0.70, 1.40]
+•	game_size_sales_mult: Indie=0.65, Medium=0.90, Big=1.10, AAA=1.35
+
+9.4.2 Alcance de plataformas e idiomas
+•	platform_reach = soma(market_share_plataforma_i)  (cap em 1.0)
+•	language_reach_total = 1.0 - produto(1.0 - reach_idioma_i)
+•	audience_reach = reach_classificacao_etaria (ex: Everyone=1.0, Teen=0.72, Mature=0.45)
+
+9.4.3 Unidades vendidas por semana
+•	base_demand_size: Indie=15000, Medium=40000, Big=90000, AAA=180000
+•	hype_decay(week) = exp(-LAMBDA_HYPE * week)
+•	LAMBDA_HYPE recomendado: 0.06
+•	units_week = base_demand_size
+			      * score_mult
+			      * reputation_mult
+			      * genre_popularity_mult
+			      * market_trend_mult
+			      * fit_genre_theme_mult
+			      * fit_genre_target_mult
+			      * game_size_sales_mult
+			      * platform_reach
+			      * language_reach_total
+			      * audience_reach
+			      * marketing_mult
+			      * event_mult
+			      * hype_decay(week)
+
+9.4.4 Receita líquida
+•	gross_revenue_week = units_week * preco_jogo
+•	platform_fee_rate (default): 0.30
+•	engine_royalty_rate = share (se engine licensed) senão 0
+•	discount_rate = desconto ativo (0 se não houver)
+•	net_revenue_week = gross_revenue_week * (1 - discount_rate) * (1 - platform_fee_rate - engine_royalty_rate)
+
+
+9.5 Reputação e Fãs
+9.5.1 Delta de reputação por lançamento
+•	rep_delta_base = (score_final - 60) * 0.25
+•	size_rep_mult: Indie=0.8, Medium=1.0, Big=1.2, AAA=1.4
+•	rep_delta = clamp(rep_delta_base * size_rep_mult, -20, +20)
+•	reputation_new = clamp(reputation_old + rep_delta, 0, 100)
+
+9.5.2 Evolução de fãs
+•	fans_gain = round(units_lifetime * (0.02 + score_final / 5000.0) * (0.75 + reputation_new / 200.0))
+•	se score_final < 50:
+•		fans_loss = round(fans_current * (50 - score_final) / 500.0)
+•	senão:
+•		fans_loss = 0
+•	fans_new = max(0, fans_current + fans_gain - fans_loss)
+
+
+9.6 Custos de Desenvolvimento
+9.6.1 Duração (semanas)
+•	base_weeks_size: Indie=16, Medium=28, Big=44, AAA=64
+•	language_complexity_mult = 1.0 + soma(complexity_idioma_i)
+•	feature_complexity_mult = 1.0 + (complexidade_features_ativas * 0.08)
+•	team_velocity = clamp(0.60 + 0.80 * (media_skills_projeto / 100.0), 0.60, 1.40)
+•	dev_weeks = (base_weeks_size * language_complexity_mult * feature_complexity_mult) / team_velocity
+
+9.6.2 Custo total
+•	monthly_salary_cost = soma(salary_funcionarios_ativos) + custo_vida_fundador
+•	salary_cost_total = monthly_salary_cost * (dev_weeks / 4.0)
+•	platform_license_total = soma(licenca_plataforma_i)
+•	language_dev_cost_mult = 1.0 + soma(dev_cost_idioma_i)
+•	base_production_cost_size: Indie=25000, Medium=90000, Big=260000, AAA=700000
+•	production_cost = base_production_cost_size * language_dev_cost_mult
+•	engine_feature_research_cost = soma(custo_feature_engine_nova)
+•	total_dev_cost = salary_cost_total + platform_license_total + production_cost + engine_feature_research_cost
+
+
+9.7 Engines e Restrições de Features
+9.7.1 Restrições de hardware por plataforma
+Para um conjunto de features F selecionadas:
+•	cpu_used = soma(cpu_cost_feature_j), para j em F
+•	gpu_used = soma(gpu_cost_feature_j), para j em F
+•	válido se cpu_used <= cpu_plataforma E gpu_used <= gpu_plataforma
+
+9.7.2 Bónus de adequação técnica
+•	feature_relevance_ratio = features_relevantes_ativas / max(1, features_relevantes_disponiveis)
+•	feature_bonus_mult = 1.0 + min(0.20, 0.25 * feature_relevance_ratio)
+
+9.7.3 Receita passiva de engine comercial
+Por jogo third-party lançado na engine:
+•	engine_passive_income = gross_revenue_terceiro * share
+
+
+9.8 Contratação de Funcionários
+9.8.1 Salário de mercado esperado
+•	avg_skill = mean([design, programming, art, marketing, support])
+•	market_salary = base_role_salary * (0.80 + avg_skill / 125.0 + anos_experiencia * 0.03)
+
+9.8.2 Probabilidade de candidatura relevante
+•	fit_main = skill_main_role / 100.0
+•	fit_secondary = skill_secondary_role / 100.0
+•	salary_fit = 1.0 - abs(salary_expectation - market_salary) / max(1, market_salary)
+•	salary_fit clamp em [0.0, 1.0]
+•	candidate_score = 0.55 * fit_main + 0.25 * fit_secondary + 0.20 * salary_fit
+
+9.8.3 Número de candidatos por ronda
+•	base_candidates = 12
+•	market_tightness em [0.6, 1.4] (mercado aquecido reduz oferta)
+•	filter_strictness em [0.5, 1.5] (mais restritivo, menos candidatos)
+•	num_candidates = round(base_candidates * (1.0 / filter_strictness) * (1.0 / market_tightness))
+•	num_candidates mínimo = 1
+
+
+9.9 Tempo, Tendências e Eventos
+9.9.1 Atualização temporal
+•	1 tick = 1 semana
+•	mês quando tick % 4 == 0
+•	ano quando tick % 48 == 0
+
+9.9.2 Popularidade dinâmica de género
+•	genre_pop_t+1 = clamp(genre_pop_t + drift + shock, -0.30, +0.30)
+•	drift = A * sin((2 * PI * tick / 48.0) + fase_genero)
+•	A recomendado: 0.01
+•	shock é evento discreto (ex: +/-0.05)
+
+9.9.3 GOTY
+•	Se jogo vence GOTY no ano Y:
+•		goty_mult(week_since_award) = 1.0 + 0.75 * exp(-0.08 * week_since_award)
+•		aplicar goty_mult durante 24 semanas
+
+9.9.4 Summer Sale
+•	discount_rate em [0.10, 0.60]
+•	sale_units_mult = 1.0 + 1.20 * discount_rate
+•	sale_event_mult = sale_units_mult
+•	Na receita líquida mantém-se: net_revenue = gross * (1 - discount_rate) * fees
+
+
+9.10 Satisfação, Aumentos e Saídas
+9.10.1 Justiça salarial
+•	salary_fairness = salary_atual / market_salary
+
+9.10.2 Satisfação mensal
+•	satisfaction_delta_month = +2.0 * min(1.0, salary_fairness)
+				  - 4.0 * max(0.0, 1.0 - salary_fairness)
+				  - crunch_penalty
+•	satisfaction = clamp(satisfaction + satisfaction_delta_month, 0, 100)
+
+9.10.3 Pedido de aumento
+•	p_raise_month = clamp(0.05 + 0.01 * meses_sem_aumento + 0.35 * max(0.0, 1.0 - salary_fairness), 0.0, 0.80)
+
+9.10.4 Probabilidade de saída
+•	p_quit_week = clamp(0.01 + max(0.0, 40 - satisfaction) / 200.0 + 0.05 * underpaid_flag, 0.0, 0.60)
+
+
+9.11 Balanceamento Inicial Recomendado (para playtest)
+•	Objetivo de score médio early game: 58-72
+•	Objetivo de margem líquida por jogo Indie: 8%-22%
+•	Objetivo de variação de reputação por lançamento: -8 a +12
+•	Objetivo de duração média (Indie): 14-22 semanas
+•	Objetivo de churn anual de funcionários: 5%-18%
+
+Estes intervalos são metas de tuning. Valores finais devem ser ajustados por telemetria de playtests.

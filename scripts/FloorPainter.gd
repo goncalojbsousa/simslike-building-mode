@@ -44,6 +44,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _paint_tile() -> void:
 	var tile  : Vector2i = mouse_raycast.get_tile_under_mouse()
+	if not App.get_grid_service().is_tile_inside_build_bounds(tile):
+		return
 	var floor_index : int = App.get_floor_service().current_floor
 	var mat   := current_material
 	var target_tiles := _collect_target_tiles(tile, floor_index, Input.is_key_pressed(KEY_SHIFT))
@@ -58,7 +60,7 @@ func _paint_tile() -> void:
 	if target_tiles.size() > 1:
 		label = "paint room floor"
 
-	App.get_history_service().execute(
+	App.execute_build_command(
 		label,
 		func():
 			var next_materials: Dictionary = {}
@@ -71,17 +73,22 @@ func _paint_tile() -> void:
 
 func _collect_target_tiles(origin_tile: Vector2i, floor_index: int, shift_pressed: bool) -> Dictionary:
 	if not shift_pressed:
+		if not App.get_grid_service().is_tile_inside_build_bounds(origin_tile):
+			return {}
 		return {origin_tile: true}
 
 	var room_id : int = App.get_wall_service().get_room_id_for_tile(origin_tile, floor_index)
 	if room_id != -1:
-		return App.get_wall_service().get_room_tiles_by_id(room_id, floor_index)
+		return _filter_tiles_to_grid_bounds(App.get_wall_service().get_room_tiles_by_id(room_id, floor_index))
 
-	return App.get_room_service().get_all_floor_tiles(floor_index)
+	return _filter_tiles_to_grid_bounds(App.get_room_service().get_all_floor_tiles(floor_index))
 
 func _update_hover_preview() -> void:
 	var floor_index : int = App.get_floor_service().current_floor
 	var tile: Vector2i = mouse_raycast.get_tile_under_mouse()
+	if not App.get_grid_service().is_tile_inside_build_bounds(tile):
+		_clear_preview()
+		return
 	var target_tiles := _collect_target_tiles(tile, floor_index, Input.is_key_pressed(KEY_SHIFT))
 	if target_tiles.is_empty():
 		_clear_preview()
@@ -107,6 +114,16 @@ func _get_material_signature_id(mat: Material) -> int:
 	if mat == null:
 		return -1
 	return mat.get_instance_id()
+
+func _filter_tiles_to_grid_bounds(tiles: Dictionary) -> Dictionary:
+	var filtered: Dictionary = {}
+	for tile_key in tiles.keys():
+		if not (tile_key is Vector2i):
+			continue
+		var tile: Vector2i = tile_key
+		if App.get_grid_service().is_tile_inside_build_bounds(tile):
+			filtered[tile] = true
+	return filtered
 
 func _rebuild_preview_mesh(tiles: Dictionary, floor_index: int) -> void:
 	_ensure_preview_mesh()

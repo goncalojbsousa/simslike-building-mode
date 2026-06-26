@@ -139,6 +139,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if ke.pressed and ke.keycode == KEY_ESCAPE:
 			_cancel_drag()
 			return
+		if ke.pressed and ke.keycode == KEY_DELETE:
+			delete_selected_rooms()
+			return
 
 	if event is InputEventMouseButton:
 		var mb = event as InputEventMouseButton
@@ -195,6 +198,14 @@ func _on_left_released() -> void:
 		_commit_move_drag()
 	elif _drag.is_resize():
 		_commit_resize_drag()
+
+func select_room_from_external_click(tile: Vector2i, additive: bool = false) -> void:
+	if not active or _drag.is_active():
+		return
+	if additive:
+		_toggle_room_selection_at_tile(tile)
+		return
+	_select_room_at_tile(tile)
 
 # ---------------------------------------------------------------------------
 # Move drag
@@ -447,7 +458,7 @@ func delete_selected_rooms() -> bool:
 
 	var opening_snapshots := _snapshot_room_openings(selected_tiles_snapshot)
 
-	App.get_history_service().execute(
+	App.execute_build_command(
 		"delete room",
 		func():
 			App.get_wall_service().begin_batch()
@@ -1885,7 +1896,7 @@ func _restore_openings_with_delta(snapshots: Array[Dictionary], delta_tiles: Vec
 			str(snapshot.get("scene_path", "")))
 
 # ---------------------------------------------------------------------------
-# Plan validation & application (calls into App.get_wall_service() + App.get_history_service())
+# Plan validation & application (walls/furniture + App.execute_build_command for undo)
 # ---------------------------------------------------------------------------
 func _can_apply_wall_delta(base_tiles: Dictionary, target_tiles: Dictionary, is_resize: bool) -> bool:
 	var plan = _build_adaptive_plan(base_tiles, target_tiles, is_resize)
@@ -1949,7 +1960,7 @@ func _apply_tile_transform(base_tiles: Dictionary, target_tiles: Dictionary, lab
 		return false
 
 	# ----- Undo/redo registration -----
-	App.get_history_service().execute(
+	App.execute_build_command(
 		label,
 		# DO:
 		func():

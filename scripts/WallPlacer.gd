@@ -260,7 +260,7 @@ func _commit_wall_move_drag() -> void:
 	var opening_snapshot := _build_opening_snapshot_for_wall(wall_key)
 	var did_move := [false]
 
-	App.get_history_service().execute(
+	App.execute_build_command(
 		"move wall",
 		func():
 			did_move[0] = _move_wall_segment(from_a, from_b, to_a, to_b, floor_index, opening_snapshot)
@@ -393,7 +393,7 @@ func _commit_room(from_corner: Vector2i, to_corner: Vector2i) -> void:
 	if new_pairs.is_empty():
 		return
 
-	App.get_history_service().execute(
+	App.execute_build_command(
 		"place room",
 		func():
 			App.get_wall_service().begin_batch()
@@ -423,7 +423,7 @@ func _commit_place_segment(from_corner: Vector2i, to_corner: Vector2i) -> void:
 			new_pairs.append(pairs[i + 1])
 	if new_pairs.is_empty():
 		return
-	App.get_history_service().execute(
+	App.execute_build_command(
 		"place walls",
 		func():
 			App.get_wall_service().begin_batch()
@@ -449,7 +449,7 @@ func _commit_delete_segment(from_corner: Vector2i, to_corner: Vector2i) -> void:
 			existing_pairs.append(pairs[i + 1])
 	if existing_pairs.is_empty():
 		return
-	App.get_history_service().execute(
+	App.execute_build_command(
 		"delete walls",
 		func():
 			App.get_wall_service().begin_batch()

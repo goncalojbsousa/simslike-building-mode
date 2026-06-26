@@ -63,3 +63,32 @@ func get_build_persistence_service() -> Node:
 	if current_session == null:
 		return null
 	return current_session.get("build_persistence_service")
+
+
+func get_build_context() -> Variant:
+	if current_session == null:
+		return null
+	if current_session.has_method("get_build_context"):
+		return current_session.call("get_build_context")
+	return null
+
+
+## Routes reversible build actions through `BuildContext` (falls back if no session context).
+func execute_build_command(label: String, do_action: Callable, undo_action: Callable) -> void:
+	var ctx: Variant = get_build_context()
+	if ctx != null and ctx.has_method("execute"):
+		ctx.execute(label, do_action, undo_action)
+		return
+	var history := get_history_service()
+	if history != null and history.has_method("execute"):
+		history.execute(label, do_action, undo_action)
+
+
+func clear_build_history() -> void:
+	var ctx: Variant = get_build_context()
+	if ctx != null and ctx.has_method("clear_history"):
+		ctx.clear_history()
+		return
+	var history := get_history_service()
+	if history != null and history.has_method("clear"):
+		history.clear()

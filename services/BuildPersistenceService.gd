@@ -55,8 +55,7 @@ func clear_world_state() -> void:
 	if App.get_room_service() != null and App.get_room_service().has_method("clear_all_tile_materials"):
 		App.get_room_service().clear_all_tile_materials()
 
-	if App.get_history_service() != null and App.get_history_service().has_method("clear"):
-		App.get_history_service().clear()
+	App.clear_build_history()
 
 func _serialize_walls() -> Array:
 	var result: Array = []
@@ -109,9 +108,13 @@ func _serialize_furniture() -> Array:
 			"tile": [tile.x, tile.y],
 			"floor_index": int(snapshot.get("floor_index", 0)),
 			"scene_path": str(snapshot.get("scene_path", "")),
+			"item_id": str(snapshot.get("item_id", "")),
 			"rotation_index": int(snapshot.get("rotation_index", 0)),
 			"size": [int((snapshot.get("size", Vector2i.ONE) as Vector2i).x), int((snapshot.get("size", Vector2i.ONE) as Vector2i).y)],
 			"uses_grid_occupancy": bool(snapshot.get("uses_grid_occupancy", true)),
+			"attachment_slots": snapshot.get("attachment_slots", []),
+			"attached_to_node_id": int(snapshot.get("attached_to_node_id", -1)),
+			"attached_slot_id": str(snapshot.get("attached_slot_id", "")),
 			"world_pos": [world_pos.x, world_pos.y, world_pos.z],
 		})
 	return result
@@ -185,9 +188,13 @@ func _restore_furniture(items: Array) -> void:
 			"tile": tile,
 			"floor_index": int(item.get("floor_index", 0)),
 			"scene_path": str(item.get("scene_path", "")),
+			"item_id": str(item.get("item_id", "")),
 			"rotation_index": int(item.get("rotation_index", 0)),
 			"size": size,
 			"uses_grid_occupancy": bool(item.get("uses_grid_occupancy", true)),
+			"attachment_slots": item.get("attachment_slots", []),
+			"attached_to_node_id": int(item.get("attached_to_node_id", -1)),
+			"attached_slot_id": str(item.get("attached_slot_id", "")),
 			"world_pos": world_pos,
 		}
 		App.get_furniture_service().restore_snapshot(snapshot)

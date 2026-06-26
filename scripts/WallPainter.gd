@@ -73,7 +73,7 @@ func _paint_single_side(target: Dictionary) -> void:
 	if old_color == current_color:
 		return
 
-	App.get_history_service().execute(
+	App.execute_build_command(
 		"paint wall side",
 		func(): App.get_wall_service().set_wall_side_color_by_key(wall_key, side, current_color),
 		func(): App.get_wall_service().set_wall_side_color_by_key(wall_key, side, old_color)
@@ -90,7 +90,7 @@ func _paint_multiple_sides(targets: Array[Dictionary], label: String) -> void:
 			"old_color": App.get_wall_service().get_wall_side_color_by_key(key, side),
 		})
 
-	App.get_history_service().execute(
+	App.execute_build_command(
 		label,
 		func():
 			for target in targets:

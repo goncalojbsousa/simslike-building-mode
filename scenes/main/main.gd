@@ -11,10 +11,6 @@ extends Node3D
 @onready var ground_grid: Node3D = get_node_or_null("Ground") as Node3D
 @onready var build_mode_ui: Control = get_node_or_null("CanvasLayer/BuildModeUi") as Control
 
-const FURNITURE_CATALOG := {
-	"desk": { "scene": "res://scenes/furniture/Desk.tscn", "size": Vector2i(1, 2) },
-}
-
 var _unsaved_confirm_dialog: ConfirmationDialog = null
 var _pending_destructive_action: Dictionary = {}
 
@@ -48,6 +44,33 @@ func _setup_unsaved_confirm_dialog() -> void:
 	_unsaved_confirm_dialog.confirmed.connect(_on_unsaved_confirmed)
 	(canvas_layer as Node).add_child(_unsaved_confirm_dialog)
 
+func _input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	var mb := event as InputEventMouseButton
+	if mb.button_index != MOUSE_BUTTON_LEFT or not mb.pressed:
+		return
+	if build_mode_ui == null or mouse_raycast == null:
+		return
+	if _has_explicit_tool_selected():
+		return
+
+	# Prioritize placed furniture interaction when no explicit tool is selected.
+	if _focus_furniture_context_from_click(true):
+		get_viewport().set_input_as_handled()
+		return
+
+	if _is_room_selection_blocked_by_furniture():
+		return
+
+	# Keep RoomEditor interactions untouched when it is already the active tool.
+	if room_editor != null and bool(room_editor.get("active")):
+		return
+
+	# Force room selection priority even while other tools are selected.
+	if _focus_room_context_from_click():
+		get_viewport().set_input_as_handled()
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
@@ -72,10 +95,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_E: App.get_floor_service().go_up()
 		KEY_Z:
 			if ke.ctrl_pressed or ke.meta_pressed:
-				App.get_history_service().undo()
+				_undo_build()
 		KEY_Y:
 			if ke.ctrl_pressed or ke.meta_pressed:
-				App.get_history_service().redo()
+				_redo_build()
 		KEY_F11:
 			var window := get_window()
 			if window:
@@ -145,18 +168,41 @@ func _activate_structure_from_payload(payload: Dictionary) -> void:
 func _apply_auto_context_from_click() -> void:
 	if build_mode_ui == null or mouse_raycast == null:
 		return
-	if _is_auto_context_locked_by_current_tool():
+	if _has_explicit_tool_selected():
 		return
 
 	if _focus_furniture_context_from_click():
 		return
-	if _focus_wall_context_from_click():
+
+	if _is_room_selection_blocked_by_furniture():
 		return
+
+	# Room selection should always be available when no tool is explicitly selected.
 	if _focus_room_context_from_click():
+		return
+
+	if _is_auto_context_locked_by_current_tool():
+		return
+
+	if _focus_wall_context_from_click():
 		return
 
 	if build_mode_ui.has_method("set_selection_context"):
 		build_mode_ui.call("set_selection_context", "none")
+
+func _has_explicit_tool_selected() -> bool:
+	if build_mode_ui == null:
+		return false
+	if not build_mode_ui.has_method("get_active_item_id"):
+		return false
+	return str(build_mode_ui.call("get_active_item_id")) != ""
+
+func _is_room_selection_blocked_by_furniture() -> bool:
+	if furniture_placer == null:
+		return false
+	if not furniture_placer.has_method("is_room_selection_locked"):
+		return false
+	return bool(furniture_placer.call("is_room_selection_locked"))
 
 func _is_auto_context_locked_by_current_tool() -> bool:
 	if build_mode_ui == null:
@@ -177,15 +223,24 @@ func _is_auto_context_locked_by_current_tool() -> bool:
 
 	return false
 
-func _focus_furniture_context_from_click() -> bool:
+func _focus_furniture_context_from_click(start_drag: bool = false) -> bool:
 	var floor_index: int = int(App.get_floor_service().current_floor)
 	var world_pos: Vector3 = mouse_raycast.get_world_position_under_mouse()
 	var snapshot: Dictionary = App.get_furniture_service().get_snapshot_at_world(world_pos, floor_index)
 	if snapshot.is_empty():
 		return false
 
+	var furniture_edit_was_active := false
+	if furniture_placer != null:
+		furniture_edit_was_active = bool(furniture_placer.get("active")) and int(furniture_placer.get("_tool_mode")) == 2
+
+	var switched_mode := false
 	if build_mode_ui.has_method("select_context_item"):
-		build_mode_ui.call("select_context_item", "furniture", "furniture_select_move", true)
+		switched_mode = bool(build_mode_ui.call("select_context_item", "furniture", "furniture_select_move", true))
+	if not switched_mode and not furniture_edit_was_active:
+		_activate_furniture_edit_mode()
+	if furniture_placer != null and furniture_placer.has_method("select_edit_from_external_click"):
+		furniture_placer.call("select_edit_from_external_click", start_drag)
 	if build_mode_ui.has_method("set_selection_context"):
 		build_mode_ui.call("set_selection_context", "furniture")
 	return true
@@ -196,8 +251,18 @@ func _focus_room_context_from_click() -> bool:
 	if App.get_wall_service().get_room_id_for_tile(tile, floor_index) == -1:
 		return false
 
+	var room_editor_was_active := false
+	if room_editor != null:
+		room_editor_was_active = bool(room_editor.get("active"))
+
+	var switched_mode := false
 	if build_mode_ui.has_method("select_context_item"):
-		build_mode_ui.call("select_context_item", "structure", "structure_room_select", true)
+		switched_mode = bool(build_mode_ui.call("select_context_item", "structure", "structure_room_select", true))
+	if not switched_mode and not room_editor_was_active:
+		_activate_room_edit_mode()
+
+	if not room_editor_was_active and room_editor != null and room_editor.has_method("select_room_from_external_click"):
+		room_editor.call("select_room_from_external_click", tile, Input.is_key_pressed(KEY_CTRL))
 	if build_mode_ui.has_method("set_selection_context"):
 		build_mode_ui.call("set_selection_context", "room")
 	return true
@@ -214,8 +279,11 @@ func _focus_wall_context_from_click() -> bool:
 
 	for offset in offsets:
 		if App.get_wall_service().has_wall(tile, tile + offset, floor_index):
+			var switched_mode := false
 			if build_mode_ui.has_method("select_context_item"):
-				build_mode_ui.call("select_context_item", "structure", "structure_wall_select", true)
+				switched_mode = bool(build_mode_ui.call("select_context_item", "structure", "structure_wall_select", true))
+			if not switched_mode:
+				_activate_wall_mode("select")
 			if build_mode_ui.has_method("set_selection_context"):
 				build_mode_ui.call("set_selection_context", "wall")
 			return true
@@ -228,11 +296,29 @@ func _on_ui_floor_up_requested() -> void:
 func _on_ui_floor_down_requested() -> void:
 	App.get_floor_service().go_down()
 
+func _undo_build() -> void:
+	var ctx: Variant = App.get_build_context()
+	if ctx != null:
+		ctx.undo()
+		return
+	var history := App.get_history_service()
+	if history != null:
+		history.undo()
+
+func _redo_build() -> void:
+	var ctx: Variant = App.get_build_context()
+	if ctx != null:
+		ctx.redo()
+		return
+	var history := App.get_history_service()
+	if history != null:
+		history.redo()
+
 func _on_ui_undo_requested() -> void:
-	App.get_history_service().undo()
+	_undo_build()
 
 func _on_ui_redo_requested() -> void:
-	App.get_history_service().redo()
+	_redo_build()
 
 func _on_ui_new_requested() -> void:
 	_request_destructive_action("new", "")
@@ -317,11 +403,21 @@ func _activate_wall_mode(action: String = "") -> void:
 
 func _activate_furniture_mode(key: String) -> void:
 	_deactivate_all()
-	var item: Dictionary = FURNITURE_CATALOG.get(key, {})
-	if item.is_empty() or furniture_placer == null:
+	if furniture_placer == null:
+		return
+	var ctx: Variant = App.get_build_context()
+	if ctx == null:
+		return
+	var spec: Dictionary = ctx.furniture_placer_activation(key)
+	if spec.is_empty():
 		return
 	if furniture_placer.has_method("activate"):
-		furniture_placer.activate(item["scene"], item["size"])
+		furniture_placer.activate(
+			str(spec.get("scene_path", "")),
+			spec.get("size", Vector2i(1, 1)) as Vector2i,
+			str(spec.get("item_id", key)),
+			spec.get("attachment_slots", []) as Array
+		)
 
 func _activate_furniture_from_payload(payload: Dictionary) -> void:
 	var action := str(payload.get("action", "place"))
@@ -337,14 +433,19 @@ func _activate_furniture_from_payload(payload: Dictionary) -> void:
 
 	var scene_path := str(payload.get("scene_path", ""))
 	var size : Variant = payload.get("size", Vector2i(1, 1))
+	var item_id := str(payload.get("item_id", ""))
 	if scene_path == "":
-		_activate_furniture_mode("desk")
+		var ctx_fallback: Variant = App.get_build_context()
+		var fallback_id := "desk"
+		if ctx_fallback != null:
+			fallback_id = str(ctx_fallback.default_furniture_item_id())
+		_activate_furniture_mode(fallback_id)
 		return
 	if not (size is Vector2i):
 		size = Vector2i(1, 1)
 	_deactivate_all()
 	if furniture_placer != null and furniture_placer.has_method("activate"):
-		furniture_placer.activate(scene_path, size)
+		furniture_placer.activate(scene_path, size, item_id, payload.get("attachment_slots", []))
 
 func _activate_furniture_edit_mode() -> void:
 	_deactivate_all()

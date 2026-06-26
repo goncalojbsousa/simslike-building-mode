@@ -1,0 +1,85 @@
+[gd_scene format=3 uid="uid://cp42lw46d2fbu"]
+
+[ext_resource type="Script" uid="uid://cyviil6knkcat" path="res://scenes/main/Main.gd" id="1_1rhdn"]
+[ext_resource type="Shader" uid="uid://m8fivrx7djhv" path="res://materials/GridMaterial.gdshader" id="1_u1xfj"]
+[ext_resource type="PackedScene" uid="uid://bdeolllyekxwh" path="res://scenes/ui/BuildModeUI.tscn" id="2_3km4f"]
+[ext_resource type="PackedScene" uid="uid://dgep2mlm12hr0" path="res://scenes/camera/CameraRig.tscn" id="2_nha0i"]
+[ext_resource type="Script" uid="uid://c777cdmfeloxm" path="res://scripts/MouseRaycast.gd" id="3_q24mn"]
+[ext_resource type="Script" uid="uid://bs7ypee2pc7p7" path="res://scripts/WallPlacer.gd" id="4_dc040"]
+[ext_resource type="Script" uid="uid://c18i4b2cagrop" path="res://scenes/walls/WallVisuals.gd" id="4_gyg6b"]
+[ext_resource type="Script" uid="uid://ck1oc5y3r3014" path="res://scripts/FurniturePlacer.gd" id="6_sjxhf"]
+[ext_resource type="Script" uid="uid://dcxpl1txm5ner" path="res://scripts/OpeningPlacer.gd" id="7_n8skm"]
+[ext_resource type="Script" uid="uid://1lys5byust2m" path="res://scripts/FloorPainter.gd" id="8_hf7ee"]
+[ext_resource type="Script" uid="uid://dndsdavrc3t76" path="res://scripts/RoomEditor.gd" id="9_7c60v"]
+[ext_resource type="Script" uid="uid://btp3lemdirp25" path="res://scripts/WallPainter.gd" id="10_wpaint"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_vyk5b"]
+size = Vector2(100, 100)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_nha0i"]
+render_priority = 0
+shader = ExtResource("1_u1xfj")
+shader_parameter/tile_size = 2.0
+shader_parameter/line_thickness = 0.02
+shader_parameter/line_color = Color(1, 1, 1, 0.25)
+shader_parameter/fill_color = Color(0, 0, 0, 0)
+shader_parameter/contrast_boost = 4.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_u4u5m"]
+albedo_color = Color(0.286275, 0.529412, 0.25098, 1)
+
+[node name="Main" type="Node3D" unique_id=534080925]
+script = ExtResource("1_1rhdn")
+
+[node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=938985616]
+
+[node name="BuildModeUi" parent="CanvasLayer" unique_id=1847549497 instance=ExtResource("2_3km4f")]
+
+[node name="Ground" type="MeshInstance3D" parent="." unique_id=538603552]
+mesh = SubResource("PlaneMesh_vyk5b")
+surface_material_override/0 = SubResource("ShaderMaterial_nha0i")
+
+[node name="Grass" type="MeshInstance3D" parent="." unique_id=1637302412]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.02, 0)
+mesh = SubResource("PlaneMesh_vyk5b")
+surface_material_override/0 = SubResource("StandardMaterial3D_u4u5m")
+
+[node name="CameraRig" parent="." unique_id=840342181 instance=ExtResource("2_nha0i")]
+
+[node name="MouseRaycast" type="Node" parent="." unique_id=252530184 node_paths=PackedStringArray("camera")]
+script = ExtResource("3_q24mn")
+camera = NodePath("../CameraRig/PitchArm/Camera3D")
+
+[node name="WallPlacer" type="Node" parent="." unique_id=1919074811 node_paths=PackedStringArray("mouse_raycast")]
+script = ExtResource("4_dc040")
+mouse_raycast = NodePath("../MouseRaycast")
+
+[node name="FurniturePlacer" type="Node" parent="." unique_id=156165863 node_paths=PackedStringArray("mouse_raycast")]
+script = ExtResource("6_sjxhf")
+mouse_raycast = NodePath("../MouseRaycast")
+active = null
+free_collision_padding = null
+
+[node name="OpeningPlacer" type="Node" parent="." unique_id=12451102 node_paths=PackedStringArray("mouse_raycast")]
+script = ExtResource("7_n8skm")
+mouse_raycast = NodePath("../MouseRaycast")
+
+[node name="FloorPainter" type="Node" parent="." unique_id=211483337 node_paths=PackedStringArray("mouse_raycast")]
+script = ExtResource("8_hf7ee")
+mouse_raycast = NodePath("../MouseRaycast")
+
+[node name="WallPainter" type="Node" parent="." unique_id=344270965 node_paths=PackedStringArray("mouse_raycast")]
+script = ExtResource("10_wpaint")
+mouse_raycast = NodePath("../MouseRaycast")
+
+[node name="RoomEditor" type="Node" parent="." unique_id=1356532220 node_paths=PackedStringArray("mouse_raycast")]
+script = ExtResource("9_7c60v")
+mouse_raycast = NodePath("../MouseRaycast")
+
+[node name="WallContainer" type="Node3D" parent="." unique_id=982250955]
+script = ExtResource("4_gyg6b")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1174415966]
+transform = Transform3D(1, 0, 0, 0, 0.31995162, 0.9474339, 0, -0.9474339, 0.31995162, 0, 22.945633, 4.470126)
+
+[editable path="CameraRig"]

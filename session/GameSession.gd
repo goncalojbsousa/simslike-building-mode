@@ -8,6 +8,9 @@ const WALL_SERVICE_SCRIPT := preload("res://services/WallService.gd")
 const FURNITURE_SERVICE_SCRIPT := preload("res://services/FurnitureService.gd")
 const ROOM_SERVICE_SCRIPT := preload("res://services/RoomService.gd")
 const BUILD_PERSISTENCE_SERVICE_SCRIPT := preload("res://services/BuildPersistenceService.gd")
+const BUILD_CATALOG_SERVICE_SCRIPT := preload("res://services/BuildCatalogService.gd")
+
+const BUILD_CONTEXT_SCRIPT := preload("res://application/BuildContext.gd")
 
 var build_mode_state: RefCounted = null
 var floor_state: RefCounted = null
@@ -25,6 +28,9 @@ var wall_service: Node = null
 var furniture_service: Node = null
 var room_service: Node = null
 var build_persistence_service: Node = null
+var build_catalog_service: Node = null
+
+var _build_context: RefCounted = null
 
 func _enter_tree() -> void:
 	_ensure_states()
@@ -63,6 +69,8 @@ func _ensure_services() -> void:
 		room_service = _spawn_service(ROOM_SERVICE_SCRIPT, "RoomService")
 	if build_persistence_service == null:
 		build_persistence_service = _spawn_service(BUILD_PERSISTENCE_SERVICE_SCRIPT, "BuildPersistenceService")
+	if build_catalog_service == null:
+		build_catalog_service = _spawn_service(BUILD_CATALOG_SERVICE_SCRIPT, "BuildCatalogService")
 
 func _spawn_service(script_ref: Script, service_name: String) -> Node:
 	var service: Node = script_ref.new()
@@ -101,3 +109,9 @@ func reset_build_state() -> void:
 	if not build_persistence_service.has_method("new_build"):
 		return
 	build_persistence_service.call("new_build")
+
+
+func get_build_context() -> RefCounted:
+	if _build_context == null:
+		_build_context = BUILD_CONTEXT_SCRIPT.new(self)
+	return _build_context

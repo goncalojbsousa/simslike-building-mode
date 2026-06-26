@@ -3,34 +3,10 @@
 		{
 			"id": "structure",
 			"label": "Structure",
-			"description": "Unified room and wall workflow: select/edit rooms, select/move walls, draw, rectangle, and delete.",
+			"description": "Direct-select workflow: click rooms/walls to edit. Use tools for draw, rectangle, and wall delete.",
 			"mode": "structure",
-			"default_item_id": "structure_room_select",
+			"default_item_id": "structure_wall_draw",
 			"items": [
-				{
-					"id": "structure_room_select",
-					"label": "Select Room",
-					"description": "Select a room and move or resize it directly.",
-					"payload": {
-						"action": "room_select"
-					}
-				},
-				{
-					"id": "structure_room_delete",
-					"label": "Delete Selected Room",
-					"description": "Delete walls around the currently selected room.",
-					"payload": {
-						"action": "room_delete_selected"
-					}
-				},
-				{
-					"id": "structure_wall_select",
-					"label": "Select / Move Wall",
-					"description": "Select an existing wall segment and drag to move it.",
-					"payload": {
-						"action": "wall_select"
-					}
-				},
 				{
 					"id": "structure_wall_draw",
 					"label": "Draw Wall",
@@ -60,26 +36,10 @@
 		{
 			"id": "furniture",
 			"label": "Furniture",
-			"description": "Place, select/move/rotate, and delete furniture from one menu.",
+			"description": "Place furniture from the catalog. Click placed furniture to select/move/rotate/delete directly.",
 			"mode": "furniture",
-			"default_item_id": "furniture_select_move",
+			"default_item_id": "desk",
 			"items": [
-				{
-					"id": "furniture_select_move",
-					"label": "Select / Move",
-					"description": "Select placed furniture to move it and press R to rotate after placement.",
-					"payload": {
-						"action": "edit"
-					}
-				},
-				{
-					"id": "furniture_delete",
-					"label": "Delete Furniture",
-					"description": "Click placed furniture to remove it.",
-					"payload": {
-						"action": "delete"
-					}
-				},
 				{
 					"id": "desk",
 					"label": "Desk",
@@ -90,6 +50,35 @@
 						"size": [
 							1.0,
 							2.0
+						],
+						"attachment_slots": [
+							{
+								"slot_id": "desk_chair",
+								"local_offset": [
+									0.0,
+									0.0,
+									2.3
+								],
+								"rotation_offset": 2.0,
+								"allowed_item_ids": [
+									"office_chair"
+								]
+							},
+							{
+								"slot_id": "desk_computer",
+								"local_offset": [
+									0.0,
+									0.84,
+									-0.75
+								],
+								"rotation_offset": 0.0,
+								"allowed_item_ids": [
+									"mini_pc",
+									"monitor",
+									"monitor_ultrawide",
+									"laptop"
+								]
+							}
 						]
 					}
 				},

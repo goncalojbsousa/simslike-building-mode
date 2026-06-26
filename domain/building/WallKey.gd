@@ -1,3 +1,4 @@
+class_name WallKey
 extends RefCounted
 
 static func make_key(a: Vector2i, b: Vector2i, floor_index: int) -> String:

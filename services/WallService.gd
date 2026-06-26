@@ -179,6 +179,10 @@ func can_place_wall(a: Vector2i, b: Vector2i, floor_index: int = -1) -> bool:
 	var diff := b - a
 	if abs(diff.x) + abs(diff.y) != 1:
 		return false
+	var grid_service = App.get_grid_service()
+	if grid_service != null:
+		if not grid_service.is_tile_inside_build_bounds(a) or not grid_service.is_tile_inside_build_bounds(b):
+			return false
 	if has_wall(a, b, f):
 		return false
 	# Upper floors can overhang the floor below by a limited number of cells.

@@ -39,12 +39,6 @@ func _floor_service() -> Node:
 		return null
 	return app.call("get_floor_service")
 
-func _history_service() -> Node:
-	var app = _app()
-	if app == null:
-		return null
-	return app.call("get_history_service")
-
 func _opening_system() -> Node:
 	var app = _app()
 	if app == null:
@@ -289,10 +283,7 @@ func _commit_opening() -> void:
 	if opening_system == null:
 		return
 
-	var history_service = _history_service()
-	if history_service == null:
-		return
-	history_service.execute(
+	App.execute_build_command(
 		"place " + type,
 		func(): opening_system.call("place_opening", key, type, off_t, path),
 		func(): opening_system.call("remove_opening", key)
